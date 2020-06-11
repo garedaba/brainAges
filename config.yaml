@@ -1,0 +1,12 @@
+paths:
+  datapath : /home/gball/PROJECTS/brainAges/subject_data/
+  results : /home/gball/PROJECTS/brainAges/results/
+  genpath : /home/gball/PROJECTS/brainAges/generated_data/
+
+data:
+  parcellation : HCP
+
+preproc:
+  regress : yes
+  pca : yes
+  pca_comps : 250
