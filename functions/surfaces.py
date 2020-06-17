@@ -111,7 +111,7 @@ def save_surface_out(data, plot_path, hemi='lh', parc='HCP', template='fsaverage
         template: 'fsaverage' or 'fsaverage5'
 
         """
-        parcDir = '/home/gball/PROJECTS/brainAges/parcellations'
+        parc_dir = '/home/gball/PROJECTS/brainAges/parcellations'
 
         if parc=='HCP':
                 labels  = mghformat.load(parc_dir + '/' + hemi + '.HCP-MMP1.mgh')
@@ -122,7 +122,7 @@ def save_surface_out(data, plot_path, hemi='lh', parc='HCP', template='fsaverage
                         out_data[labels==n+1] = data[n]
 
         elif parc=='cust250':
-                labels  = mghformat.load(parc_dir + '/lh.custom500.mgh')
+                labels  = mghformat.load(parc_dir + '/' + hemi + '.custom500.mgh')
                 labels = np.array(labels.get_fdata()).squeeze()
 
                 out_data = np.zeros(np.shape(labels))

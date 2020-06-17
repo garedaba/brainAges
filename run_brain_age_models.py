@@ -6,9 +6,11 @@ import seaborn as sns
 
 import os, glob
 import yaml
+from tqdm import tqdm
 
 from functions.surfaces import load_surf_data, parcellateSurface
-from functions.models import get_ensemble_model, get_linear_model, get_nonlinear_model, get_model_explanations
+from functions.models import get_ensemble_model, get_linear_model, get_nonlinear_model
+from functions.models import get_model_explanations, get_age_corrected_model_explanations, correct_age_predictions
 from functions.misc import pre_process_metrics
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import r2_score, mean_absolute_error
@@ -38,6 +40,7 @@ def main():
     preprocessing_params = cfg['preproc']
     regress = 'Corrected' if preprocessing_params['regress'] else 'Raw'
     run_pca = 'PCA' if preprocessing_params['pca'] else 'noPCA'
+    run_combat = 'Combat' if preprocessing_params['combat'] else 'noCombat'
 
     # cortical parcellation
     parc = cfg['data']['parcellation']
@@ -91,8 +94,7 @@ def main():
     preds = np.zeros((n_subs, 3))
     fold = np.zeros((n_subs, 1))
     feature_explanations = np.zeros((3, n_subs, n_features*2))
-    if run_pca=='PCA':
-        pca_explanations = np.zeros((3, n_subs, preprocessing_params['pca_comps']*2))
+    linear_model_coefficients = np.zeros((5, n_features*2)) # num_folds x features
 
     # cross-validation
     for n, (train_idx, test_idx) in enumerate(skf.split(np.arange(n_subs), subject_data.Site)):
@@ -103,30 +105,54 @@ def main():
         train_y, test_y = subject_data.Age[train_idx], subject_data.Age[test_idx]
 
         # run any required processing separetely on metric data (thickness and area)
-        train_x, test_x, pca_models = pre_process_metrics(metric_names, metric_data, train_idx, test_idx, preprocessing_params)
+        train_x, test_x = pre_process_metrics(metric_names, metric_data, subject_data, train_idx, test_idx, preprocessing_params)
 
         # run models in each fold
         fold[test_idx] = n+1
         print('')
-        # get pre-specified models as pipelines with randomised nested CV parameter search
-        for m, (model_name, model) in enumerate(zip(['linear', 'nonlinear', 'ensemble'], [get_linear_model(), get_nonlinear_model(), get_ensemble_model()])):
+        # get pre-specified models as pipelines with randomised nested CV parameter search, with or without PCA
+        models = [get_linear_model(preprocessing_params),
+                   get_nonlinear_model(preprocessing_params),
+                   get_ensemble_model(preprocessing_params)]
+
+        # for each model
+        for m, (model_name, model) in enumerate(zip(['linear', 'nonlinear','ensemble'], models)):
+
             # FIT
             print('fitting {:} model'.format(model_name))
             model.fit(train_x, train_y)
+
             # PREDICT
-            preds[test_idx, m] = model.predict(test_x)
+            train_predictions = model.predict(train_x)
+            test_predictions = model.predict(test_x)
+
+            # CORRECT FOR AGE EFFECT
+            preds[test_idx, m] = correct_age_predictions(train_predictions, train_y, test_predictions, test_y)
+
+            print('{:} model: r2 score = {:.2f}'.format(model_name, r2_score(test_y, preds[test_idx, m])))
+            print('{:} correlation between age and delta = {:.2f}'.format(model_name, np.corrcoef(test_y, test_predictions-test_y)[0,1]))
+            print('{:} correlation between age and corrected delta = {:.2f}'.format(model_name, np.corrcoef(test_y, preds[test_idx, m]-test_y)[0,1]))
+
             # EXPLAIN
             print('calculating {:} model explanations for test data'.format(model_name))
-            exp_features = round(n_features/10)
-            model_explanations = get_model_explanations(model, train_x, test_x, num_features=exp_features)
-            # if PCA has been performed, transform importances back to feature space
-            # - sum of individual PC component maps, weighted by contribution in an individual
-            if run_pca == 'PCA':
-                pca_explanations[m, test_idx, :] = model_explanations
-                feature_explanations[m, test_idx, :] = np.concatenate((model_explanations[:,:pca_models[0].n_components_].dot(pca_models[0].components_),
-                                                                     model_explanations[:,pca_models[0].n_components_:].dot(pca_models[1].components_)), axis=1)
-            else:
-                feature_explanations[m, test_idx, :] = model_explanations
+            exp_features = round(np.shape(train_x)[1]/2)
+            # normally a sparse model to limit number of features, but better to get values for each sub?
+            model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
+            for s in tqdm(np.arange(len(test_x))):
+                model_explanations[s,:] = get_age_corrected_model_explanations(model, train_x, train_y, test_x[s,:].reshape(1,-1),
+                                                                                    age=test_y.iloc[s], num_features=exp_features)
+
+            # collate
+            feature_explanations[m, test_idx, :] = model_explanations
+
+            # also keep model coefficients for linear models
+            if model_name == 'linear':
+                if run_pca == 'PCA':
+                    model_coefficients = model.best_estimator_['model'].coef_.dot(model.best_estimator_['pca'].components_)
+                else:
+                    model_coefficients = model.best_estimator_['model'].coef_
+                linear_model_coefficients[n, :] = model_coefficients
+
 
     #####################################################################################################
     # RESULTS
@@ -140,9 +166,9 @@ def main():
     predictions = pd.concat((subject_data, fold, preds), axis=1)
 
     # saving
-    print('model predictions: {:}model_predictions-{:}-{:}-{:}.csv'.format(outpath, regress, run_pca, parc))
+    print('model predictions: {:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc))
     print('')
-    predictions.to_csv('{:}model_predictions-{:}-{:}-{:}.csv'.format(outpath, regress, run_pca, parc), index=False)
+    predictions.to_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc), index=False)
 
     # accuracies and AUC
     n_fold = len(np.unique(predictions.fold))
@@ -163,27 +189,27 @@ def main():
     fold_r2.insert(0, 'fold', np.unique(predictions.fold))
 
     # saving
-    print('model accuracy (MAE): {:}MAE-{:}-{:}-{:}.csv'.format(outpath, regress, run_pca, parc))
-    fold_mae.to_csv('{:}MAE-{:}-{:}-{:}.csv'.format(outpath, regress, run_pca, parc), index=False)
-    print('model accuracy (R2): {:}R2-{:}-{:}-{:}.csv'.format(outpath, regress, run_pca, parc))
-    fold_r2.to_csv('{:}R2-{:}-{:}-{:}.csv'.format(outpath, regress, run_pca, parc), index=False)
+    print('model accuracy (MAE): {:}MAE-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc))
+    fold_mae.to_csv('{:}MAE-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc), index=False)
+    print('model accuracy (R2): {:}R2-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc))
+    fold_r2.to_csv('{:}R2-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc), index=False)
     print('')
 
     # explainations
-    for m, model_name in enumerate(zip(['linear', 'nonlinear', 'ensemble'])):
+    for m, model_name in enumerate(['linear', 'nonlinear', 'ensemble']):
         exp = pd.DataFrame(feature_explanations[m])
         fold = pd.DataFrame(fold.astype(int), columns=['fold'])
         feat_exp = pd.concat((subject_data, fold, exp), axis=1)
-        print('model explanations: {:}{:}-model-feature-explanations-{:}-{:}-{:}.csv'.format(genpath, model_name, regress, run_pca, parc))
+        print('model explanations: {:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, combat, regress, run_pca, parc))
         print('')
-        feat_exp.to_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}.csv'.format(genpath, model_name, regress, run_pca, parc), index=False)
-        if run_pca=='PCA':
-            pcexp = pd.DataFrame(pca_explanations[m])
-            fold = pd.DataFrame(fold.astype(int), columns=['fold'])
-            pcexp = pd.concat((subject_data, fold, pcexp), axis=1)
-            print('model explanations (PCA): {:}{:}-model-pca-explanations-{:}-{:}-{:}.csv'.format(genpath, model_name, regress, run_pca, parc))
+        feat_exp.to_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, combat, regress, run_pca, parc), index=False)
+        if model_name == 'linear':
+            fold_col = pd.DataFrame(np.arange(5).reshape(-1,1), columns=['fold'])
+            coef = pd.DataFrame(linear_model_coefficients)
+            feat_coef = pd.concat((fold_col, coef), axis=1)
+            print('model coefficients: {:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, combat, regress, run_pca, parc))
             print('')
-            pcexp.to_csv('{:}{:}-model-pca-explanations-{:}-{:}-{:}.csv'.format(genpath, model_name, regress, run_pca, parc), index=False)
+            feat_coef.to_csv('{:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, combat, regress, run_pca, parc), index=False)
 
     #####################################################################################################
     # PLOTTING
@@ -198,11 +224,11 @@ def main():
             plot_age_scatters(predictions.Age, predictions[model + '_preds'], predictions[mapping], ax=ax, palette=pal)
             ax.set_title(model, fontsize=16)
         plt.tight_layout()
-        print('saving model scatters to: {:}model_predictions-{:}-{:}-by{:}-{:}.png'.format(outpath, regress, run_pca, mapping, parc))
-        plt.savefig('{:}model_predictions-{:}-{:}-by{:}-{:}.png'.format(outpath, regress, run_pca, mapping, parc))
+        print('saving model scatters to: {:}model_predictions-{:}-{:}-{:}-by{:}-{:}.png'.format(outpath, combat, regress, run_pca, mapping, parc))
+        plt.savefig('{:}model_predictions-{:}-{:}-{:}-by{:}-{:}.png'.format(outpath, combat, regress, run_pca, mapping, parc))
 
     fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4), sharey=False)
-    for dat, val, ax, pal, lims in zip([fold_mae, fold_r2], ['MAE', 'r2'], [ax1, ax2], ['inferno', 'inferno'], [(0,4), (0,1)]):
+    for dat, val, ax, pal, lims in zip([fold_mae, fold_r2], ['MAE', 'r2'], [ax1, ax2], ['inferno', 'inferno'], [(0,4), (0.5,1)]):
 
         plot_df = dat.melt(id_vars='fold', var_name='model', value_name=val)
 
@@ -217,8 +243,8 @@ def main():
 
     plt.tight_layout()
     print('')
-    print('saving model accuracies to: {:}model_accuracies-{:}-{:}-{:}.png'.format(outpath, regress, run_pca, parc))
-    plt.savefig('{:}model_accuracies-{:}-{:}-{:}.png'.format(outpath, regress, run_pca, parc))
+    print('saving model accuracies to: {:}model_accuracies-{:}-{:}-{:}-{:}.png'.format(outpath, combat, regress, run_pca, parc))
+    plt.savefig('{:}model_accuracies-{:}-{:}-{:}-{:}.png'.format(outpath, combat, regress, run_pca, parc))
 
 
 

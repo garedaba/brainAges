@@ -7,6 +7,8 @@ data:
   parcellation : HCP
 
 preproc:
-  regress : yes
-  pca : yes
-  pca_comps : 250
+  combat : yes
+  regress : no
+  pca : no
+  pca_comps : .95 # int, for number of components, or 0<float<1 for % variance
+#todo: regress,no, pca,yes;regress,yes,pca,no;all with cust250
