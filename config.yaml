@@ -4,11 +4,11 @@ paths:
   genpath : /home/gball/PROJECTS/brainAges/generated_data/
 
 data:
-  parcellation : HCP
+  parcellation : cust250
 
 preproc:
   combat : yes
   regress : no
   pca : no
-  pca_comps : .95 # int, for number of components, or 0<float<1 for % variance
+  pca_comps : .9 # int, for number of components, or 0<float<1 for % variance
 #todo: regress,no, pca,yes;regress,yes,pca,no;all with cust250

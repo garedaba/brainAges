@@ -51,7 +51,7 @@ def get_nonlinear_model(params):
     returns:
     model: sklearn estimator
     """
-    kernel = 1 * RBF(length_scale=5.0, length_scale_bounds=(0.01, 100.0)) + WhiteKernel(0.1)
+    kernel = 1 * RBF(length_scale=10.0, length_scale_bounds=(1.0, 1000.0)) + WhiteKernel(10.0, noise_level_bounds=(5.0,1000))
 
     ss = StandardScaler()
     gpr = GaussianProcessRegressor(kernel=kernel, alpha=0, normalize_y=True, n_restarts_optimizer=10)
@@ -72,7 +72,7 @@ def get_ensemble_model(params):
     model: sklearn estimator
     """
     ss = StandardScaler()
-    xgb_reg = xgb.XGBRegressor(objective="reg:squarederror",n_jobs=1, n_estimators=500, base_score=12, learning_rate=0.05, random_state=42)
+    xgb_reg = xgb.XGBRegressor(objective="reg:squarederror",n_jobs=1, base_score=12, learning_rate=0.05, random_state=42)
 
     if params['pca']:
         pca = PCA(n_components=params['pca_comps'], whiten=True)
@@ -81,6 +81,7 @@ def get_ensemble_model(params):
         xgb_model = Pipeline(steps=(['scale', ss], ['model', xgb_reg]))
 
     xgb_model_params = {
+        "model__n_estimators": [100,250,500],
         "model__colsample_bytree": uniform(0.5, 0.5), # default 1
         "model__min_child_weight": randint(1,6),        #deafult 1
         "model__max_depth": randint(2, 5),            # default 3, 3-10 -
@@ -89,7 +90,7 @@ def get_ensemble_model(params):
     }
 
     # model: classifier with randomised parameter search over nested 3-fold CV (more iters to account for large space)
-    ensemble_model = RandomizedSearchCV(xgb_model, xgb_model_params, n_iter=100, cv=5, verbose=1, n_jobs=5)
+    ensemble_model = RandomizedSearchCV(xgb_model, xgb_model_params, n_iter=250, cv=5, verbose=1, n_jobs=5)
 
     return clone(ensemble_model)
 

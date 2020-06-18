@@ -121,7 +121,8 @@ def main():
             # FIT
             print('fitting {:} model'.format(model_name))
             model.fit(train_x, train_y)
-
+            if model_name=='nonlinear':
+                print(model['model'].kernel_)
             # PREDICT
             train_predictions = model.predict(train_x)
             test_predictions = model.predict(test_x)
@@ -166,9 +167,9 @@ def main():
     predictions = pd.concat((subject_data, fold, preds), axis=1)
 
     # saving
-    print('model predictions: {:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc))
+    print('model predictions: {:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))
     print('')
-    predictions.to_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc), index=False)
+    predictions.to_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc), index=False)
 
     # accuracies and AUC
     n_fold = len(np.unique(predictions.fold))
@@ -189,10 +190,10 @@ def main():
     fold_r2.insert(0, 'fold', np.unique(predictions.fold))
 
     # saving
-    print('model accuracy (MAE): {:}MAE-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc))
-    fold_mae.to_csv('{:}MAE-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc), index=False)
-    print('model accuracy (R2): {:}R2-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc))
-    fold_r2.to_csv('{:}R2-{:}-{:}-{:}-{:}.csv'.format(outpath, combat, regress, run_pca, parc), index=False)
+    print('model accuracy (MAE): {:}MAE-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))
+    fold_mae.to_csv('{:}MAE-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc), index=False)
+    print('model accuracy (R2): {:}R2-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))
+    fold_r2.to_csv('{:}R2-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc), index=False)
     print('')
 
     # explainations
@@ -200,16 +201,16 @@ def main():
         exp = pd.DataFrame(feature_explanations[m])
         fold = pd.DataFrame(fold.astype(int), columns=['fold'])
         feat_exp = pd.concat((subject_data, fold, exp), axis=1)
-        print('model explanations: {:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, combat, regress, run_pca, parc))
+        print('model explanations: {:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc))
         print('')
-        feat_exp.to_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, combat, regress, run_pca, parc), index=False)
+        feat_exp.to_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
         if model_name == 'linear':
             fold_col = pd.DataFrame(np.arange(5).reshape(-1,1), columns=['fold'])
             coef = pd.DataFrame(linear_model_coefficients)
             feat_coef = pd.concat((fold_col, coef), axis=1)
-            print('model coefficients: {:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, combat, regress, run_pca, parc))
+            print('model coefficients: {:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc))
             print('')
-            feat_coef.to_csv('{:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, combat, regress, run_pca, parc), index=False)
+            feat_coef.to_csv('{:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
 
     #####################################################################################################
     # PLOTTING
@@ -224,8 +225,8 @@ def main():
             plot_age_scatters(predictions.Age, predictions[model + '_preds'], predictions[mapping], ax=ax, palette=pal)
             ax.set_title(model, fontsize=16)
         plt.tight_layout()
-        print('saving model scatters to: {:}model_predictions-{:}-{:}-{:}-by{:}-{:}.png'.format(outpath, combat, regress, run_pca, mapping, parc))
-        plt.savefig('{:}model_predictions-{:}-{:}-{:}-by{:}-{:}.png'.format(outpath, combat, regress, run_pca, mapping, parc))
+        print('saving model scatters to: {:}model_predictions-{:}-{:}-{:}-by{:}-{:}.png'.format(outpath, run_combat, regress, run_pca, mapping, parc))
+        plt.savefig('{:}model_predictions-{:}-{:}-{:}-by{:}-{:}.png'.format(outpath, run_combat, regress, run_pca, mapping, parc))
 
     fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4), sharey=False)
     for dat, val, ax, pal, lims in zip([fold_mae, fold_r2], ['MAE', 'r2'], [ax1, ax2], ['inferno', 'inferno'], [(0,4), (0.5,1)]):
@@ -243,8 +244,8 @@ def main():
 
     plt.tight_layout()
     print('')
-    print('saving model accuracies to: {:}model_accuracies-{:}-{:}-{:}-{:}.png'.format(outpath, combat, regress, run_pca, parc))
-    plt.savefig('{:}model_accuracies-{:}-{:}-{:}-{:}.png'.format(outpath, combat, regress, run_pca, parc))
+    print('saving model accuracies to: {:}model_accuracies-{:}-{:}-{:}-{:}.png'.format(outpath, run_combat, regress, run_pca, parc))
+    plt.savefig('{:}model_accuracies-{:}-{:}-{:}-{:}.png'.format(outpath, run_combat, regress, run_pca, parc))
 
 
 
