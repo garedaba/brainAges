@@ -92,8 +92,11 @@ def main():
 
     # space for predictions and explanations
     preds = np.zeros((n_subs, 3))
+    uncorr_preds = np.zeros((n_subs, 3))
     fold = np.zeros((n_subs, 1))
     feature_explanations = np.zeros((3, n_subs, n_features*2))
+    sample_mean_feature_explanations = np.zeros((3, n_subs, n_features*2))
+
     linear_model_coefficients = np.zeros((5, n_features*2)) # num_folds x features
 
     # cross-validation
@@ -128,10 +131,11 @@ def main():
             test_predictions = model.predict(test_x)
 
             # CORRECT FOR AGE EFFECT
+            uncorr_preds[test_idx, m] = test_predictions
             preds[test_idx, m] = correct_age_predictions(train_predictions, train_y, test_predictions, test_y)
 
             print('{:} model: r2 score = {:.2f}'.format(model_name, r2_score(test_y, preds[test_idx, m])))
-            print('{:} correlation between age and delta = {:.2f}'.format(model_name, np.corrcoef(test_y, test_predictions-test_y)[0,1]))
+            print('{:} correlation between age and delta = {:.2f}'.format(model_name, np.corrcoef(test_y, uncorr_preds[test_idx, m]-test_y)[0,1]))
             print('{:} correlation between age and corrected delta = {:.2f}'.format(model_name, np.corrcoef(test_y, preds[test_idx, m]-test_y)[0,1]))
 
             # EXPLAIN
@@ -139,17 +143,21 @@ def main():
             exp_features = round(np.shape(train_x)[1]/2)
             # normally a sparse model to limit number of features, but better to get values for each sub?
             model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
+            sample_mean_model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
+
             for s in tqdm(np.arange(len(test_x))):
                 model_explanations[s,:] = get_age_corrected_model_explanations(model, train_x, train_y, test_x[s,:].reshape(1,-1),
                                                                                     age=test_y.iloc[s], num_features=exp_features)
+            sample_mean_model_explanations = get_model_explanations(model, train_x, test_x, num_features=exp_features)
 
             # collate
             feature_explanations[m, test_idx, :] = model_explanations
+            sample_mean_feature_explanations[m, test_idx, :] = sample_mean_model_explanations
 
             # also keep model coefficients for linear models
             if model_name == 'linear':
                 if run_pca == 'PCA':
-                    model_coefficients = model.best_estimator_['model'].coef_.dot(model.best_estimator_['pca'].components_)
+                    model_coefficients = (model.best_estimator_['model'].coef_ * model.best_estimator_['pca'].explained_variance_).dot(model.best_estimator_['pca'].components_)
                 else:
                     model_coefficients = model.best_estimator_['model'].coef_
                 linear_model_coefficients[n, :] = model_coefficients
@@ -162,7 +170,7 @@ def main():
     print('compiling results')
     print('---------------------------------------------------------')
     # collate data
-    preds = pd.DataFrame(preds, columns = ['linear_preds', 'nonlinear_preds', 'ensemble_preds'])
+    preds = pd.DataFrame(np.hstack((preds, uncorr_preds)), columns = ['linear_preds', 'nonlinear_preds', 'ensemble_preds', 'linear_uncorr_preds', 'nonlinear_uncorr_preds', 'ensemble_uncorr_preds'])
     fold = pd.DataFrame(fold.astype(int), columns=['fold'])
     predictions = pd.concat((subject_data, fold, preds), axis=1)
 
@@ -199,11 +207,15 @@ def main():
     # explainations
     for m, model_name in enumerate(['linear', 'nonlinear', 'ensemble']):
         exp = pd.DataFrame(feature_explanations[m])
+        mean_exp = pd.DataFrame(sample_mean_feature_explanations[m])
         fold = pd.DataFrame(fold.astype(int), columns=['fold'])
         feat_exp = pd.concat((subject_data, fold, exp), axis=1)
+        mean_feat_exp = pd.concat((subject_data, fold, mean_exp), axis=1)
         print('model explanations: {:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc))
         print('')
         feat_exp.to_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
+        mean_feat_exp.to_csv('{:}{:}-model-group-mean-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
+
         if model_name == 'linear':
             fold_col = pd.DataFrame(np.arange(5).reshape(-1,1), columns=['fold'])
             coef = pd.DataFrame(linear_model_coefficients)

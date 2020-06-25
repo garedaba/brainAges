@@ -18,9 +18,8 @@ import numpy as np
 import shap
 
 def get_linear_model(params):
-    """output a sparse linear regressor with randomised parameter search over nested 3-fold CV
+    """output a sparse linear regressor with randomised parameter search over nested 5-fold CV
     params: dict, containing details on PCA if required
-
     returns:
     model: sklearn estimator
     """
@@ -65,7 +64,7 @@ def get_nonlinear_model(params):
     return clone(nonlinear_model)
 
 def get_ensemble_model(params):
-    """output a nonlinear XGBoost regressor with randomised parameter search over nested 3-fold CV
+    """output a nonlinear XGBoost regressor with randomised parameter search over nested 5-fold CV
     params: dict, containing details on PCA if required
 
     returns:
