@@ -39,7 +39,7 @@ def get_linear_model(params):
     }
 
     # model: classifier with randomised parameter search over nested 3-fold CV
-    linear_model = RandomizedSearchCV(lr_model, lr_model_params, n_iter=100, cv=5)
+    linear_model = RandomizedSearchCV(lr_model, lr_model_params, n_iter=500, cv=5)
 
     return clone(linear_model)
 
@@ -50,8 +50,8 @@ def get_nonlinear_model(params):
     returns:
     model: sklearn estimator
     """
-    kernel = 1 * RBF(length_scale=10.0, length_scale_bounds=(1.0, 1000.0)) + WhiteKernel(10.0, noise_level_bounds=(5.0,1000))
-
+    #kernel = 1 * RBF(length_scale=10.0, length_scale_bounds=(1.0, 1000.0)) + WhiteKernel(10.0, noise_level_bounds=(1.0,1000))
+    kernel = 1 * DotProduct(sigma_0=0.0, sigma_0_bounds='fixed') + RBF(length_scale=10.0, length_scale_bounds=(1.0, 1000.0)) + WhiteKernel(10.0, noise_level_bounds=(1.0,1000))
     ss = StandardScaler()
     gpr = GaussianProcessRegressor(kernel=kernel, alpha=0, normalize_y=True, n_restarts_optimizer=10)
 
@@ -89,7 +89,7 @@ def get_ensemble_model(params):
     }
 
     # model: classifier with randomised parameter search over nested 3-fold CV (more iters to account for large space)
-    ensemble_model = RandomizedSearchCV(xgb_model, xgb_model_params, n_iter=250, cv=5, verbose=1, n_jobs=5)
+    ensemble_model = RandomizedSearchCV(xgb_model, xgb_model_params, n_iter=500, cv=5, verbose=1, n_jobs=5)
 
     return clone(ensemble_model)
 
