@@ -51,9 +51,9 @@ def get_nonlinear_model(params):
     model: sklearn estimator
     """
     #kernel = 1 * RBF(length_scale=10.0, length_scale_bounds=(1.0, 1000.0)) + WhiteKernel(10.0, noise_level_bounds=(1.0,1000))
-    kernel = 1 * DotProduct(sigma_0=0.0, sigma_0_bounds='fixed') + RBF(length_scale=10.0, length_scale_bounds=(1.0, 1000.0)) + WhiteKernel(10.0, noise_level_bounds=(1.0,1000))
+    kernel = 1 * DotProduct(sigma_0=1e-5, sigma_0_bounds='fixed') + RBF(length_scale=10.0, length_scale_bounds=(1.0, 1000.0)) + WhiteKernel(10.0, noise_level_bounds=(1.0,1000))
     ss = StandardScaler()
-    gpr = GaussianProcessRegressor(kernel=kernel, alpha=0, normalize_y=True, n_restarts_optimizer=10)
+    gpr = GaussianProcessRegressor(kernel=kernel, alpha=0, normalize_y=True, n_restarts_optimizer=50)
 
     if params['pca']:
         pca = PCA(n_components=params['pca_comps'], whiten=True)

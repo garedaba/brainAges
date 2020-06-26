@@ -1,9 +1,6 @@
 import numpy as np
 import pandas as pd
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 import os, glob
 import yaml
 from tqdm import tqdm
@@ -99,7 +96,7 @@ def main():
 
     linear_model_coefficients = np.zeros((5, n_features*2)) # num_folds x features
 
-    # cross-validation
+    # cross-validation - stratified by site
     for n, (train_idx, test_idx) in enumerate(skf.split(np.arange(n_subs), subject_data.Site)):
         print('')
         print('FOLD {:}:------------------------------------------------'.format(n+1))
@@ -125,7 +122,7 @@ def main():
             print('fitting {:} model'.format(model_name))
             model.fit(train_x, train_y)
             if model_name=='nonlinear':
-                print(model['model'].kernel_)
+                print(model['model'].kernel_) # remove later
             # PREDICT
             train_predictions = model.predict(train_x)
             test_predictions = model.predict(test_x)
@@ -134,14 +131,15 @@ def main():
             uncorr_preds[test_idx, m] = test_predictions
             preds[test_idx, m] = correct_age_predictions(train_predictions, train_y, test_predictions, test_y)
 
-            print('{:} model: r2 score = {:.2f}'.format(model_name, r2_score(test_y, preds[test_idx, m])))
+            print('{:} model: r2 score = {:.2f}'.format(model_name, r2_score(test_y, uncorr_preds[test_idx, m])))
             print('{:} correlation between age and delta = {:.2f}'.format(model_name, np.corrcoef(test_y, uncorr_preds[test_idx, m]-test_y)[0,1]))
             print('{:} correlation between age and corrected delta = {:.2f}'.format(model_name, np.corrcoef(test_y, preds[test_idx, m]-test_y)[0,1]))
+            print('{:} model: corrected r2 score = {:.2f}'.format(model_name, r2_score(test_y, preds[test_idx, m])))
 
             # EXPLAIN
             print('calculating {:} model explanations for test data'.format(model_name))
             exp_features = round(np.shape(train_x)[1]/2)
-            # normally a sparse model to limit number of features, but better to get values for each sub?
+            # normally a sparse model to limit number of features, but better to get values for each sub? Currently using at most 50%
             model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
             sample_mean_model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
 
@@ -157,7 +155,8 @@ def main():
             # also keep model coefficients for linear models
             if model_name == 'linear':
                 if run_pca == 'PCA':
-                    model_coefficients = (model.best_estimator_['model'].coef_ * model.best_estimator_['pca'].explained_variance_).dot(model.best_estimator_['pca'].components_)
+                    # not sure about this bit...
+                    model_coefficients = model.best_estimator_['pca'].components_.T.dot( model.best_estimator_['model'].coef_)
                 else:
                     model_coefficients = model.best_estimator_['model'].coef_
                 linear_model_coefficients[n, :] = model_coefficients
@@ -183,18 +182,21 @@ def main():
     n_fold = len(np.unique(predictions.fold))
     models = ['linear', 'nonlinear', 'ensemble']
 
-    fold_mae = np.zeros((n_fold, len(models)))
-    fold_r2 = np.zeros((n_fold, len(models)))
+    fold_mae = np.zeros((n_fold, len(models)*2))
+    fold_r2 = np.zeros((n_fold, len(models)*2))
 
     for n, f in enumerate(np.unique(predictions.fold)):
         for m, model in enumerate(models):
             fold_mae[n, m] = mean_absolute_error(predictions.Age[predictions.fold==f], predictions[model+'_preds'][predictions.fold==f])
-            fold_r2[n, m] = r2_score(predictions.Age[predictions.fold==f], predictions[model+'_preds'][predictions.fold==f])
+            fold_mae[n, m+3] = mean_absolute_error(predictions.Age[predictions.fold==f], predictions[model+'_uncorr_preds'][predictions.fold==f])
 
-    fold_mae = pd.DataFrame(fold_mae, columns=models)
+            fold_r2[n, m] = r2_score(predictions.Age[predictions.fold==f], predictions[model+'_preds'][predictions.fold==f])
+            fold_r2[n, m+3] = r2_score(predictions.Age[predictions.fold==f], predictions[model+'_uncorr_preds'][predictions.fold==f])
+
+    fold_mae = pd.DataFrame(fold_mae, columns=['linear', 'nonlinear', 'ensemble','linear_uncorr', 'nonlinear_uncorr', 'ensemble_uncorr'])
     fold_mae.insert(0, 'fold', np.unique(predictions.fold))
 
-    fold_r2 = pd.DataFrame(fold_r2, columns=models)
+    fold_r2 = pd.DataFrame(fold_r2, columns=['linear', 'nonlinear', 'ensemble','linear_uncorr', 'nonlinear_uncorr', 'ensemble_uncorr'])
     fold_r2.insert(0, 'fold', np.unique(predictions.fold))
 
     # saving
@@ -223,67 +225,6 @@ def main():
             print('model coefficients: {:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc))
             print('')
             feat_coef.to_csv('{:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
-
-    #####################################################################################################
-    # PLOTTING
-    #####################################################################################################
-    print('---------------------------------------------------------')
-    print('plotting')
-    print('---------------------------------------------------------')
-
-    for mapping, pal in zip(['Age', 'Site'], ['inferno', 'tab20b']):
-        fig, (ax1, ax2, ax3) = plt.subplots(1,3, figsize=(18,5), sharex=True, sharey=False)
-        for ax, model in zip([ax1,ax2,ax3], ['linear', 'nonlinear', 'ensemble']):
-            plot_age_scatters(predictions.Age, predictions[model + '_preds'], predictions[mapping], ax=ax, palette=pal)
-            ax.set_title(model, fontsize=16)
-        plt.tight_layout()
-        print('saving model scatters to: {:}model_predictions-{:}-{:}-{:}-by{:}-{:}.png'.format(outpath, run_combat, regress, run_pca, mapping, parc))
-        plt.savefig('{:}model_predictions-{:}-{:}-{:}-by{:}-{:}.png'.format(outpath, run_combat, regress, run_pca, mapping, parc))
-
-    fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4), sharey=False)
-    for dat, val, ax, pal, lims in zip([fold_mae, fold_r2], ['MAE', 'r2'], [ax1, ax2], ['inferno', 'inferno'], [(0,4), (0.5,1)]):
-
-        plot_df = dat.melt(id_vars='fold', var_name='model', value_name=val)
-
-        sns.boxplot(x='model', y=val, data=plot_df,  palette=pal, ax=ax)
-
-        ax.set_xticklabels(['linear', 'nonlinear', 'ensemble'], fontsize=16)
-        ax.set_xlabel('')
-        ax.set_ylabel(val, fontsize=18)
-        ax.tick_params(axis="both", labelsize=18)
-        ax.set_ylim(lims)
-        sns.despine(top=False, right=False)
-
-    plt.tight_layout()
-    print('')
-    print('saving model accuracies to: {:}model_accuracies-{:}-{:}-{:}-{:}.png'.format(outpath, run_combat, regress, run_pca, parc))
-    plt.savefig('{:}model_accuracies-{:}-{:}-{:}-{:}.png'.format(outpath, run_combat, regress, run_pca, parc))
-
-
-
-
-#####################################################################################################
-# HELPER FUNCTIONS
-#####################################################################################################
-# plot function for later
-def plot_age_scatters(true, predicted, colors, ax=None, palette=None):
-
-    if ax is None:
-        fig, ax = plt.subplots(1,1, figsize=(4,4))
-    if palette is None:
-        palette = 'viridis'
-
-    ax.scatter(true, predicted, edgecolor='gray', s=50, alpha=0.5, c=colors, cmap=palette)
-    ax.set_xlim(0,25)
-    ax.set_ylim(0,25)
-    lims = [0,25]
-    ax.plot(lims, lims, 'k-', lw=1, alpha=0.75, zorder=0)
-
-    ax.set_xlabel('age', fontsize=16)
-    ax.set_ylabel('predicted age', fontsize=16)
-
-    ax.tick_params(axis="both", labelsize=18)
-
 
 if __name__ == '__main__':
     main()
