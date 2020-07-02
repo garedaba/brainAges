@@ -206,7 +206,7 @@ def main():
     fold_r2.to_csv('{:}R2-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc), index=False)
     print('')
 
-    # explainations
+    # explanations
     for m, model_name in enumerate(['linear', 'nonlinear', 'ensemble']):
         exp = pd.DataFrame(feature_explanations[m])
         mean_exp = pd.DataFrame(sample_mean_feature_explanations[m])

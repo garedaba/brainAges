@@ -9,5 +9,5 @@ data:
 preproc:
   combat : yes
   regress : no
-  pca : yes
+  pca : no
   pca_comps : .9 # int, for number of components, or 0<float<1 for % variance
