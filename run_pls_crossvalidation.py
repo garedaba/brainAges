@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import r2_score
 
 from functions.pls_models import run_plsr, plsr_training_curve
 
@@ -52,9 +53,10 @@ def main():
         subject_info = model_explanations.loc[:, model_explanations.columns.isin(['ID', 'Age', 'Male', 'Site', 'fold'])]
         # feature importances
         explanations =  model_explanations.loc[:, ~model_explanations.columns.isin(['ID', 'Age', 'Male', 'Site', 'fold'])]
-        # brain age deltas
-        deltas = model_predictions[model+'_uncorr_preds'] - model_predictions.Age
-        corrected_deltas = model_predictions[model+'_preds'] - model_predictions.Age
+        # brain age deltas - corrected or uncorrected
+        #deltas = model_predictions[model+'_uncorr_preds'] - model_predictions.Age
+        deltas = model_predictions[model+'_preds'] - model_predictions.Age
+
         # folds
         cv_folds = subject_info.fold.values
 
@@ -98,7 +100,8 @@ def main():
         # outputs
         predicted_delta = np.zeros((len(deltas)))
         feature_loadings = np.zeros((np.shape(explanations)[1], plsr_comps, 5))  # num_features, num_comps, num_folds
-        explained_var = np.zeros((plsr_comps, 5))
+        explained_delta_var = np.zeros((plsr_comps, 5))
+        explained_image_var = np.zeros((plsr_comps, 5))
         subject_scores = np.zeros((np.shape(explanations)[0], plsr_comps))
 
         print('')
@@ -116,9 +119,13 @@ def main():
             # collect
             predicted_delta[cv_folds==f+1] = test_X.dot(coefs.reshape(-1))
             feature_loadings[:,:,f] = regional_loadings
-            explained_var[:,f] = component_loadings**2
+            explained_delta_var[:,f] = component_loadings**2
             subject_scores[cv_folds==f+1,:] = test_X.dot(weights)
 
+            # add norm back in to calculate correctly
+            regional_loadings = np.multiply(regional_loadings, np.linalg.norm(train_X, axis=0).reshape(np.shape(train_X)[1],1))
+            for c in np.arange(plsr_comps):
+                explained_image_var[c,f] = r2_score(train_X, component_scores[:,[c]].dot(regional_loadings[:,[c]].T))
 
         ## save out - PLSR results by components
         # TRAINING CURVE
@@ -135,20 +142,29 @@ def main():
         for p in np.arange(plsr_comps):
             pd.DataFrame(feature_loadings[:,p,:]).T.to_csv('{:}{:}-feature-loadings-PLS-CV-component-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, p+1, run_combat, regress, run_pca, parc), index=False)
         # averaged over fold
-        print('{:}{:}-mean-feature-loadings-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
+        print('see: {:}{:}-mean-feature-loadings-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
         pd.DataFrame(np.mean(feature_loadings, axis=2)).T.to_csv('{:}{:}-mean-feature-loadings-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
         # delta predictions
         delta_predictions = pd.DataFrame((cv_folds, deltas, predicted_delta)).T
         delta_predictions.columns = ['fold','delta','predicted_delta']
-        print('{:}{:}-delta-predictions-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
+        print('see: {:}{:}-delta-predictions-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
         delta_predictions.to_csv('{:}{:}-delta-predictions-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
         # subject scores
         subject_scores = pd.DataFrame(np.hstack((subject_info.ID[:,np.newaxis], cv_folds[:,np.newaxis], deltas[:,np.newaxis], subject_scores)))
         subject_scores.columns = ['id','fold','delta','PLS1','PLS2','PLS3']
-        print('{:}{:}-subject_scores-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
+        print('see: {:}{:}-subject_scores-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
         subject_scores.to_csv('{:}{:}-subject_scores-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
 
-
+        # explained variances (in training data)
+        colnames = ['fold']
+        for i in np.arange(plsr_comps):
+            colnames.append('comp{:}'.format(i+1))
+        tmpa = pd.DataFrame(np.hstack(((np.arange(5)+1).reshape(-1,1),explained_delta_var.T)), columns=colnames)
+        tmpa.insert(0, 'type', 'delta')
+        tmpb = pd.DataFrame(np.hstack(((np.arange(5)+1).reshape(-1,1),explained_image_var.T)), columns=colnames)
+        tmpb.insert(0, 'type', 'image')
+        print('see: {:}{:}-explained_variance-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
+        pd.concat((tmpa, tmpb)).to_csv('{:}{:}-explained_variance-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
 
 
 if __name__ == '__main__':
