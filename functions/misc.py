@@ -2,6 +2,8 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 from neurocombat_sklearn import CombatModel
+from brainsmash.mapgen.base import Base
+from joblib import Parallel, delayed
 
 from copy import deepcopy
 
@@ -120,3 +122,57 @@ def global_residualise(train_data, test_data):
     deconfounded_test_data = (test_data - lr.predict(c_test)) + mean_train_data
 
     return deconfounded_train_data, deconfounded_test_data
+
+
+def create_surrogates(subject_idx, features, distMat, n_samples=10):
+    """ Create surrogate maps matched for spatial autocorrelation (SA) using BrainSmash
+        Takes a list of subjects and creates n_samples surrogate maps based on SA of each subject's feature map
+
+        parameters
+        ----------
+        subjects_idx : subject indices to select feature maps from
+        features : array, n_subject x p variable feature matrix
+        distMat : precalculated geometric distance matrix with matched parcellation to subject features
+        n_samples : number of surrogate maps to produce per subject in subjects_idx
+
+        returns
+        -------
+        all_surrogates : array, (len(subject_idx) x n_samples)-by-p variables surrogate maps
+    """
+    surrogate_maps = []
+
+    for p in subject_idx:
+        gen = Base(features[p,:], distMat, resample=True)
+        surrogate_maps.append(gen(n=n_samples))
+
+    all_surrogates = np.vstack(surrogate_maps)
+
+    return all_surrogates
+
+
+def bootstrap_surrogates(features, distMat, n_boot=10, n_subjects=100, n_samples=10, n_jobs=-1):
+    """ Randomly sample n_subjects from features and calculate n_samples surrogate maps, repeat n_boot times
+
+        parameters
+        ----------
+        features : array, n_subjects x p_variables
+        distMat : precalculated geometric distance matrix with matched parcellation to subject features
+        n_boot : number of times to run surrogate generation
+        n_subjects : how many subject maps to use in surogate generation
+        n_samples : number of maps per subject feature map
+        n_jobs : number of CPUs
+
+        returns:
+        --------
+        all_surrogates : n_boot x (n_subjects x n_samples) x p_features, surrogate map data
+    """
+    print('calculating surrogates based on {:} samples of {:} subjects, with {:} maps each'.format(n_boot, n_subjects, n_samples))
+    # random selection of subjects
+    p_idx = []
+    for i in np.arange(n_boot):
+        p_idx.append(np.random.choice(len(features), size=n_subjects, replace=False))
+
+    all_surrogates = Parallel(n_jobs=n_jobs, verbose=2)(delayed(create_surrogates)
+                                                    (j, features, distMat, n_samples=n_samples) for j in p_idx)
+
+    return all_surrogates

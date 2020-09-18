@@ -43,8 +43,8 @@ def main():
         #####################################################################################################
         # LOADING
         # load previously calculated model predictions and explanations
-        #
         #####################################################################################################
+
         # load data
         model_explanations = pd.read_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model, run_combat, regress, run_pca, parc))
         model_predictions = pd.read_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))
@@ -95,8 +95,8 @@ def main():
         #####################################################################################################
         # MODEL TESTING II.- Predicting brain age delta from model explanations...
         # within 5-fold CV, calculate spatial maps for each component
-        #
         #####################################################################################################
+
         # outputs
         predicted_delta = np.zeros((len(deltas)))
         feature_loadings = np.zeros((np.shape(explanations)[1], plsr_comps, 5))  # num_features, num_comps, num_folds

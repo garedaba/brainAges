@@ -50,6 +50,7 @@ def main():
     # load surface data and parcellate into regions
     # load existing parcellated data if it's already been calculated
     #####################################################################################################
+
     print('---------------------------------------------------------')
     print('loading data')
     print('---------------------------------------------------------')
@@ -121,8 +122,7 @@ def main():
             # FIT
             print('fitting {:} model'.format(model_name))
             model.fit(train_x, train_y)
-            if model_name=='nonlinear':
-                print(model['model'].kernel_) # remove later
+
             # PREDICT
             train_predictions = model.predict(train_x)
             test_predictions = model.predict(test_x)
@@ -138,8 +138,7 @@ def main():
 
             # EXPLAIN
             print('calculating {:} model explanations for test data'.format(model_name))
-            exp_features = round(np.shape(train_x)[1]/2)
-            # normally a sparse model to limit number of features, but better to get values for each sub? Currently using at most 50%
+            exp_features = round(np.shape(train_x)[1]/2) # at most 50% of regions used in explanation
             model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
             sample_mean_model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
 
