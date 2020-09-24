@@ -167,11 +167,11 @@ def main():
             # save out
             print('')
             print('PCA on explanation data')
-            print('see: {:}{:}-{:}-explanations-explainedVariance.csv'.format(surrogates, metric, hemi))
-            print('see: {:}{:}-{:}-explanations-principal-components.csv'.format(surrogates, metric, hemi))
+            print('see: {:}{:}-{:}-explanations-explainedVariance-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            print('see: {:}{:}-{:}-explanations-principal-components-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
             print('')
-            pd.DataFrame(pca.explained_variance_ratio_, columns=['explained_variance']).to_csv('{:}{:}-{:}-explanations-explainedVariance.csv'.format(surrogates, metric, hemi))
-            pd.DataFrame(pca.components_).to_csv('{:}{:}-{:}-explanations-principal-components.csv'.format(surrogates, metric, hemi))
+            pd.DataFrame(pca.explained_variance_ratio_, columns=['explained_variance']).to_csv('{:}{:}-{:}-explanations-explainedVariance-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            pd.DataFrame(pca.components_).to_csv('{:}{:}-{:}-explanations-principal-components-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
 
             # surrogates with matched spatial autocorrelation
             surro_exp_maps = bootstrap_surrogates(exp_map,
@@ -182,8 +182,8 @@ def main():
             # save out
             print('')
             print('PCA on surrogate data')
-            print('see:{:}{:}-{:}-explanations-explainedVariance-surrogates.csv'.format(surrogates, metric, hemi))
-            pd.DataFrame(surro_exp_pcs, columns=np.arange(n_comps)+1).to_csv('{:}{:}-{:}-explanations-explainedVariance-surrogates.csv'.format(surrogates, metric, hemi), index=None)
+            print('see:{:}{:}-{:}-explanations-explainedVariance-surrogates-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            pd.DataFrame(surro_exp_pcs, columns=np.arange(n_comps)+1).to_csv('{:}{:}-{:}-explanations-explainedVariance-surrogates-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc), index=None)
 
 
             # surrogates with randomly shuffled data
@@ -195,8 +195,8 @@ def main():
             # save out
             print('')
             print('PCA on random data')
-            print('see:{:}{:}-{:}-explanations-explainedVariance-randoms.csv'.format(surrogates, metric, hemi))
-            pd.DataFrame(random_exp_pcs, columns=np.arange(n_comps)+1).to_csv('{:}{:}-{:}-explanations-explainedVariance-randoms.csv'.format(surrogates, metric, hemi), index=None)
+            print('see:{:}{:}-{:}-explanations-explainedVariance-randoms-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            pd.DataFrame(random_exp_pcs, columns=np.arange(n_comps)+1).to_csv('{:}{:}-{:}-explanations-explainedVariance-randoms-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc), index=None)
 
 
             # residuals
@@ -208,11 +208,11 @@ def main():
             # save out
             print('')
             print('PCA on residuals data')
-            print('see: {:}{:}-{:}-residuals-explainedVariance.csv'.format(surrogates, metric, hemi))
-            print('see: {:}{:}-{:}-residuals-principal-components.csv'.format(surrogates, metric, hemi))
+            print('see: {:}{:}-{:}-residuals-explainedVariance-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            print('see: {:}{:}-{:}-residuals-principal-components-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
             print('')
-            pd.DataFrame(pca.explained_variance_ratio_, columns=['explained_variance']).to_csv('{:}{:}-{:}-residuals-explainedVariance.csv'.format(surrogates, metric, hemi))
-            pd.DataFrame(pca.components_).to_csv('{:}{:}-{:}-residuals-principal-components.csv'.format(surrogates, metric, hemi))
+            pd.DataFrame(pca.explained_variance_ratio_, columns=['explained_variance']).to_csv('{:}{:}-{:}-residuals-explainedVariance-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            pd.DataFrame(pca.components_).to_csv('{:}{:}-{:}-residuals-principal-components-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
 
 
             # surrogates with matched spatial autocorrelation
@@ -224,8 +224,8 @@ def main():
             # save out
             print('')
             print('PCA on surrogate data')
-            print('see:{:}{:}-{:}-residuals-explainedVariance-surrogates.csv'.format(surrogates, metric, hemi))
-            pd.DataFrame(surro_res_pcs, columns=np.arange(n_comps)+1).to_csv('{:}{:}-{:}-residuals-explainedVariance-surrogates.csv'.format(surrogates, metric, hemi), index=None)
+            print('see:{:}{:}-{:}-residuals-explainedVariance-surrogates-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            pd.DataFrame(surro_res_pcs, columns=np.arange(n_comps)+1).to_csv('{:}{:}-{:}-residuals-explainedVariance-surrogates-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc), index=None)
 
 
             # surrogates with randomly shuffled data
@@ -237,20 +237,20 @@ def main():
             # save out
             print('')
             print('PCA on random data')
-            print('see:{:}{:}-{:}-residuals-explainedVariance-randoms.csv'.format(surrogates, metric, hemi))
-            pd.DataFrame(random_res_pcs, columns=np.arange(n_comps)+1).to_csv('{:}{:}-{:}-residuals-explainedVariance-randoms.csv'.format(surrogates, metric, hemi), index=None)
+            print('see:{:}{:}-{:}-residuals-explainedVariance-randoms-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            pd.DataFrame(random_res_pcs, columns=np.arange(n_comps)+1).to_csv('{:}{:}-{:}-residuals-explainedVariance-randoms-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc), index=None)
 
 
             # save some example maps for visualisation later
-            print('see: {:}{:}-{:}-explanations-example-surrogates.csv'.format(surrogates, metric, hemi))
-            print('see: {:}{:}-{:}-explanations-example-randoms.csv'.format(surrogates, metric, hemi))
-            print('see: {:}{:}-{:}-residuals-example-surrogates.csv'.format(surrogates, metric, hemi))
-            print('see: {:}{:}-{:}-residuals-example-randoms.csv'.format(surrogates, metric, hemi))
+            print('see: {:}{:}-{:}-explanations-example-surrogates-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            print('see: {:}{:}-{:}-explanations-example-randoms-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            print('see: {:}{:}-{:}-residuals-example-surrogates-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
+            print('see: {:}{:}-{:}-residuals-example-randoms-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc))
 
-            np.savetxt('{:}{:}-{:}-explanations-example-surrogates.csv'.format(surrogates, metric, hemi), surro_exp_maps[0], delimiter=',')
-            np.savetxt('{:}{:}-{:}-explanations-example-randoms.csv'.format(surrogates, metric, hemi), random_exp_maps[0], delimiter=',')
-            np.savetxt('{:}{:}-{:}-residuals-example-surrogates.csv'.format(surrogates, metric, hemi), surro_res_maps[0], delimiter=',')
-            np.savetxt('{:}{:}-{:}-residuals-example-randoms.csv'.format(surrogates, metric, hemi), random_res_maps[0], delimiter=',')
+            np.savetxt('{:}{:}-{:}-explanations-example-surrogates-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc), surro_exp_maps[0], delimiter=',')
+            np.savetxt('{:}{:}-{:}-explanations-example-randoms-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc), random_exp_maps[0], delimiter=',')
+            np.savetxt('{:}{:}-{:}-residuals-example-surrogates-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc), surro_res_maps[0], delimiter=',')
+            np.savetxt('{:}{:}-{:}-residuals-example-randoms-{:}-{:}-{:}-{:}-{:}.csv'.format(surrogates, metric, hemi, model, run_combat, regress, run_pca, parc), random_res_maps[0], delimiter=',')
 
 
 def run_pcas(maps, n_comps=10):
