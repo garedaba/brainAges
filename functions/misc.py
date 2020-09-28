@@ -1,11 +1,10 @@
 import numpy as np
-from sklearn.decomposition import PCA
-from sklearn.linear_model import LinearRegression
-from neurocombat_sklearn import CombatModel
-from brainsmash.mapgen.base import Base
-from joblib import Parallel, delayed
+import pandas as pd
 
-from copy import deepcopy
+from neurocombat_sklearn import CombatModel
+
+from sklearn.linear_model import LinearRegression, BayesianRidge
+from sklearn.metrics import r2_score
 
 # metric data processing
 def pre_process_metrics(metric_names, metric_data, subject_data, train_idx, test_idx, params):
@@ -24,7 +23,7 @@ def pre_process_metrics(metric_names, metric_data, subject_data, train_idx, test
 
     processed_train_data = []
     processed_test_data = []
-    pca_model = []
+
     for metric_name, metric in zip(metric_names, metric_data):
 
         print('')
@@ -124,55 +123,118 @@ def global_residualise(train_data, test_data):
     return deconfounded_train_data, deconfounded_test_data
 
 
-def create_surrogates(subject_idx, features, distMat, n_samples=10):
-    """ Create surrogate maps matched for spatial autocorrelation (SA) using BrainSmash
-        Takes a list of subjects and creates n_samples surrogate maps based on SA of each subject's feature map
+
+def deconfound(data, confounds, test_data=None, test_confounds=None):
+    """ regress variance in data due associated with confounds using OLS regression
+
+    parameters
+    ----------
+    data : array, n x p data to correct
+    confounds : array/dataframe, n x q confound design matrix
+    test_data : if None, then just correct data, otherwise correct test data using train data
+    test_confound : as above, for confounds
+
+    returns
+    -------
+    deconfounded_data : corrected data
+    deconfounded_test_data : if applicable, corrected test data
+    """
+
+    # average to add back in later
+    mean_data = np.nanmean(data,0)
+
+    # demean confounds
+    mean_confounds = np.mean(confounds)
+    confounds = confounds - mean_confounds #FIXED
+
+    # take care in case of nans
+    masked_data = np.ma.array(data, mask=np.isnan(data))
+
+    # deconfound
+    deconfounded_data = masked_data - np.ma.dot(confounds, np.ma.dot(np.linalg.pinv(confounds), masked_data))
+
+    # add back in mean
+    deconfounded_data += mean_data
+
+    if test_data is not None:
+        # take care of nans
+        masked_test_data = np.ma.array(test_data, mask=np.isnan(test_data))
+        # demean using training data
+        t_confounds = test_confounds - mean_confounds
+
+        # deconfound
+        deconfounded_test_data = masked_test_data - np.ma.dot(t_confounds, np.ma.dot(np.linalg.pinv(confounds), masked_data))
+
+        # add back in mean
+        deconfounded_test_data += mean_data
+
+    if test_data is not None:
+        return deconfounded_data, deconfounded_test_data
+    else:
+        return deconfounded_data
+
+
+
+def partition_variance(target, confounders, predictors, data):
+    """ Estimate shared and partial R2 for confounds and predictors
+        see Dinga et al:
+        https://www.biorxiv.org/content/10.1101/2020.08.17.255034v1.full
+        https://github.com/dinga92/confounds_paper/blob/master/example-analysis.Rmd
 
         parameters
         ----------
-        subjects_idx : subject indices to select feature maps from
-        features : array, n_subject x p variable feature matrix
-        distMat : precalculated geometric distance matrix with matched parcellation to subject features
-        n_samples : number of surrogate maps to produce per subject in subjects_idx
+        target : str, name of target variable
+        confounders : list, column names for confounding variables
+        predictors : str,  name of ML predictions
+        data : dataframe, containing predictors, target and confounders
 
         returns
         -------
-        all_surrogates : array, (len(subject_idx) x n_samples)-by-p variables surrogate maps
+        model_table : partial and shared R2 for each set of variables
+
     """
-    surrogate_maps = []
+    # OLS
+    #lm = LinearRegression()
+    lm = BayesianRidge()
+    #lm = Ridge()
 
-    for p in subject_idx:
-        gen = Base(features[p,:], distMat, resample=True)
-        surrogate_maps.append(gen(n=n_samples))
+    # just confounders
+    m_conf = lm.fit(data[confounders], data[target])
+    r2_conf = r2_score(data[target], lm.predict(data[confounders]))
 
-    all_surrogates = np.vstack(surrogate_maps)
+    # just predictors
+    m_pred = lm.fit(data[predictors], data[target])
+    r2_pred = r2_score(data[target], lm.predict(data[predictors]))
 
-    return all_surrogates
+    # both
+    m_both = lm.fit(data[confounders+predictors], data[target])
+    r2_both = r2_score(data[target], lm.predict(data[confounders+predictors]))
 
+    # unexplained
+    conf_unexp = 1 - r2_conf
+    pred_unexp = 1 - r2_pred
 
-def bootstrap_surrogates(features, distMat, n_boot=10, n_subjects=100, n_samples=10, n_jobs=-1):
-    """ Randomly sample n_subjects from features and calculate n_samples surrogate maps, repeat n_boot times
+    # change
+    delta_pred = r2_both - r2_conf
+    delta_conf = r2_both - r2_pred
 
-        parameters
-        ----------
-        features : array, n_subjects x p_variables
-        distMat : precalculated geometric distance matrix with matched parcellation to subject features
-        n_boot : number of times to run surrogate generation
-        n_subjects : how many subject maps to use in surogate generation
-        n_samples : number of maps per subject feature map
-        n_jobs : number of CPUs
+    # partial
+    partial_pred = delta_pred / conf_unexp
+    partial_conf = delta_conf / pred_unexp
 
-        returns:
-        --------
-        all_surrogates : n_boot x (n_subjects x n_samples) x p_features, surrogate map data
-    """
-    print('calculating surrogates based on {:} samples of {:} subjects, with {:} maps each'.format(n_boot, n_subjects, n_samples))
-    # random selection of subjects
-    p_idx = []
-    for i in np.arange(n_boot):
-        p_idx.append(np.random.choice(len(features), size=n_subjects, replace=False))
+    # shared
+    shared = r2_both - delta_conf - delta_pred
 
-    all_surrogates = Parallel(n_jobs=n_jobs, verbose=2)(delayed(create_surrogates)
-                                                    (j, features, distMat, n_samples=n_samples) for j in p_idx)
+    col_names = ['confounds',
+                 'predictions',
+                 'both',
+                 'delta confounds',
+                 'delta predictions',
+                 'partial confounds',
+                 'partial predictions',
+                 'shared']
 
-    return all_surrogates
+    model_table = pd.DataFrame([r2_conf, r2_pred, r2_both, delta_conf, delta_pred, partial_conf, partial_pred, shared]).T
+    model_table.columns = col_names
+
+    return model_table
