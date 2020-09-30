@@ -156,9 +156,11 @@ def main():
                                                                                     age=test_y.iloc[s], num_features=exp_features)
             sample_mean_model_explanations = get_model_explanations(model, train_x, test_x, num_features=exp_features)
 
-            # train explanations - for training set examples
-            for s in tqdm(np.arange(len(train_x))):
-                train_model_explanations[s,:] = get_age_corrected_model_explanations(model, train_x, train_y, train_x[s,:].reshape(1,-1),
+            # train explanations - for training set examples (exclude self)
+            print('calculating {:} model explanations for train data'.format(model_name))
+            num_train = len(train_x)
+            for s in tqdm(np.arange(num_train)):
+                train_model_explanations[s,:] = get_age_corrected_model_explanations(model, train_x[np.arange(num_train)!=s,:], train_y[np.arange(num_train)!=s], train_x[s,:].reshape(1,-1),
                                                                                     age=train_y.iloc[s], num_features=exp_features)
 
             # collate

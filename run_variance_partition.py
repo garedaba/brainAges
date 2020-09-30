@@ -64,9 +64,6 @@ def main():
       # brain age deltas
       deltas = model_predictions[model+'_uncorr_preds'] - model_predictions.Age
 
-      # folds
-      cv_folds = subject_info.fold.values
-
       # metric data
       metric_names = ['thickness', 'area']
       metric_data = []
@@ -97,7 +94,7 @@ def main():
       var_table = partition_variance('deltas', conf, pred, dat)
 
       # save out
-      var_table.to_csv('{:}variance-partition-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
+      var_table.to_csv('{:}variance-partition-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=None)
 
       #####################################################################################################
       # PARTIAL CORRELATIONS
@@ -123,8 +120,8 @@ def main():
       delta_given_explanations = pd.DataFrame(np.stack((deltas, deconfounded_delta, predicted_delta)).T, columns=['deltas', 'deconfounded_deltas', 'predicted_deltas'])
 
       # save out
-      delta_given_confounds.to_csv('{:}partial-correlations-explanations-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
-      delta_given_explanations.to_csv('{:}partial-correlations-confounds-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
+      delta_given_confounds.to_csv('{:}partial-correlations-explanations-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=None)
+      delta_given_explanations.to_csv('{:}partial-correlations-confounds-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=None)
 
 
 if __name__ == '__main__':
