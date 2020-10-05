@@ -6,6 +6,9 @@ from neurocombat_sklearn import CombatModel
 from sklearn.linear_model import LinearRegression, BayesianRidge
 from sklearn.metrics import r2_score
 
+from joblib import Parallel, delayed
+from brainsmash.mapgen.base import Base
+
 # metric data processing
 def pre_process_metrics(metric_names, metric_data, subject_data, train_idx, test_idx, params):
     """Takes list of metric data arrays and returned single feature set with requested processing
@@ -81,7 +84,7 @@ def harmonise(data, subject_info, train_idx, test_idx, batch_covar='Site', discr
 
     if  isinstance(continuous_covar, list):
         train_cont = subject_info[continuous_covar].iloc[train_idx].values
-        train_cont = subject_info[continuous_covar].iloc[test_idx].values
+        test_cont = subject_info[continuous_covar].iloc[test_idx].values
     else:
         train_cont = subject_info[continuous_covar].iloc[train_idx].values.reshape(-1,1) if continuous_covar is not None else None
         test_cont = subject_info[continuous_covar].iloc[test_idx].values.reshape(-1,1) if continuous_covar is not None else None
@@ -238,3 +241,52 @@ def partition_variance(target, confounders, predictors, data):
     model_table.columns = col_names
 
     return model_table
+
+
+def surrogate_maps(subject_idx, features, distMat, n_samples=10):
+    """ Create surrogate maps matched for spatial autocorrelation (SA) using BrainSmash
+        Takes a list of subjects and creates n_samples surrogate maps based on SA of each subject's feature map
+
+        parameters
+        ----------
+        subjects_idx : subject indices to select feature maps from
+        features : array, n_subject x p variable feature matrix
+        distMat : precalculated geometric distance matrix with matched parcellation to subject features
+        n_samples : number of surrogate maps to produce per subject in subjects_idx
+
+        returns
+        -------
+        all_surrogates : array, (len(subject_idx) x n_samples)-by-p variables surrogate maps
+    """
+    surrogate_maps = []
+
+    for p in subject_idx:
+        gen = Base(features[p,:], distMat, resample=True)
+        surrogate_maps.append(gen(n=n_samples))
+
+    all_surrogates = np.vstack(surrogate_maps)
+
+    return all_surrogates
+
+
+def create_surrogates(features, distMat, n_repeats=10, n_jobs=-1):
+    """ Create n_repeats surrogate maps for each subject from features
+
+        parameters
+        ----------
+        features : array, n_subjects x p_variables
+        distMat : precalculated geometric distance matrix with matched parcellation to subject features
+        n_repeats : number of times to run surrogate generation
+        n_jobs : number of CPUs
+
+        returns:
+        --------
+        all_surrogates : n_repeat x (n_subjects x p_features), surrogate map data
+    """
+    n_subjects = len(features)
+    print('calculating surrogates based on {:} repeats of {:} subjects'.format(n_repeats, n_subjects))
+
+    all_surrogates = Parallel(n_jobs=n_jobs, verbose=2)(delayed(surrogate_maps)
+                                                    (np.arange(n_subjects), features, distMat, n_samples=1) for j in np.arange(n_repeats))
+
+    return all_surrogates

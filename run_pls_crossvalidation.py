@@ -12,9 +12,7 @@ from sklearn.metrics import r2_score
 from functions.misc import deconfound
 from functions.pls_models import plsr_training_curve, run_plsr
 
-
 def main():
-
     #####################################################################################################
     # CONFIG
     # load configuration file and set parameters accordingly
@@ -44,8 +42,6 @@ def main():
 
     # for pls
     ss = StandardScaler()
-    init_PCA = 50
-    pca = PCA(n_components=init_PCA, whiten=True)
 
     # for each model
     for model in ['linear', 'nonlinear', 'ensemble']:
@@ -83,18 +79,14 @@ def main():
         confounds['meanthick'] = np.mean(metric_data[0],1)
         confounds['meanarea'] = np.mean(metric_data[1],1)
 
-
         #########################################################################################################
         # DECONFOUND
         # calculate deconfounded explanations and deltas for PLS within CV folds
         #########################################################################################################
         # partial out confounds
-        explanations_deconf, cv_explanations_deconf, delta_deconf = deconfound_train_test_data(model_explanations, model_predictions, confounds, cv_folds, init_PCA=init_PCA)
+        explanations_deconf, cv_explanations_deconf, delta_deconf = deconfound_train_test_data(model_explanations, model_predictions, confounds, cv_folds)
 
-        # save out - deconfounded explanations
-        pd.concat((subject_info, pd.DataFrame(cv_explanations_deconf)), axis=1).to_csv('{:}{:}-model-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model, run_combat, regress, run_pca, parc), index=None)
-
-        ##########################################################################################################################
+        #########################################################################################################
         # PLS
         ##########################################################################################################################
         #####################################################################################################
@@ -107,13 +99,13 @@ def main():
         print('performing cross-validation for model: {:}'.format(model))
         print('number of PLS components from: {:}'.format(component_choice))
 
-        fold_train_accuracy, fold_test_accuracy = pls_train_test_training_curve(explanations_deconf, delta_deconf, cv_folds, component_choice, init_PCA=init_PCA)
+        fold_train_accuracy, fold_test_accuracy = pls_train_test_training_curve(explanations_deconf, delta_deconf, cv_folds, component_choice)
 
         #####################################################################################################
         # MODEL TESTING II.- Predicting brain age delta from model explanations...
         # within 5-fold CV, calculate spatial maps for each component
         #####################################################################################################
-        plsr_comps = 2
+        plsr_comps = 1
 
         # outputs
         target_delta = np.zeros((len(delta_deconf)))
@@ -130,12 +122,8 @@ def main():
             train_data = explanations_deconf[cv_folds!=f+1,:,f]
             test_data = explanations_deconf[cv_folds==f+1,:,f]
 
-            # preprocess with PCA or scaling
-            if init_PCA is not None:
-                print('initialising PLS with {:} component PCA'.format(init_PCA))
-                train_X, test_X = pca.fit_transform(train_data), pca.transform(test_data)
-            else:
-                train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
+            # preprocess with scaling
+            train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
 
             train_Y, test_Y = delta_deconf[cv_folds!=f+1, f], delta_deconf[cv_folds==f+1, f]
 
@@ -144,25 +132,30 @@ def main():
             # collect
             target_delta[cv_folds==f+1] = test_Y
             predicted_delta[cv_folds==f+1] = test_X.dot(coefs.reshape(-1))
-            if init_PCA is not None:
-                # reverse whitening and multiply components by loadings
-                feature_loadings[:,:,f] =  ((pca.components_/np.sqrt(pca.explained_variance_)[:,np.newaxis]).T).dot(regional_loadings)
-            else:
-                feature_loadings[:,:,f] = regional_loadings
 
+            # add norm back in
+            rescaled_regional_loadings = np.multiply(regional_loadings, np.linalg.norm(train_X, axis=0).reshape(np.shape(train_X)[1],1))
+            feature_loadings[:,:,f] = rescaled_regional_loadings
+
+            # explained variance
             explained_delta_var[:,f] = component_loadings**2
+            # predicted subject scores
             subject_scores[cv_folds==f+1,:] = test_X.dot(weights)
 
             # add norm back in to calculate correctly
-            regional_loadings = np.multiply(regional_loadings, np.linalg.norm(train_X, axis=0).reshape(np.shape(train_X)[1],1))
             for c in np.arange(plsr_comps):
-                if init_PCA is not None:
-                    explained_image_var[c,f] = r2_score(train_data, pca.inverse_transform(component_scores[:,[c]].dot(regional_loadings[:,[c]].T)))
-                else:
-                    explained_image_var[c,f] = r2_score(train_X, component_scores[:,[c]].dot(regional_loadings[:,[c]].T))
+                explained_image_var[c,f] = r2_score(train_X, component_scores[:,[c]].dot(rescaled_regional_loadings[:,[c]].T))
 
+        #########################################################################################################
+        # save out - PLSR results
+        #########################################################################################################
+        # deconfounded data arrays
+        print('deconfounded model explanations for surrogate analysis: {:}{:}-model-all-fold-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
+        np.save('{:}{:}-model-all-fold-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc), explanations_deconf)
+        print('deconfounded model deltas for surrogate analysis: {:}{:}-model-all-fold-deconfounded-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
+        np.save('{:}{:}-model-all-fold-deconfounded-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc), delta_deconf)
+        print('')
 
-        ## save out - PLSR results by components
         # TRAINING CURVE
         train_results = pd.DataFrame(np.hstack((component_choice[:,np.newaxis],fold_train_accuracy)), columns=['num_comp','1','2','3','4','5'])
         train_results.insert(0, 'group','train')
@@ -202,9 +195,7 @@ def main():
         print('see: {:}{:}-explained_variance-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
         pd.concat((tmpa, tmpb)).to_csv('{:}{:}-explained_variance-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
 
-
-
-def deconfound_train_test_data(explanations, deltas, confounds, fold_ids, init_PCA=100):
+def deconfound_train_test_data(explanations, deltas, confounds, fold_ids):
     """
     split data according to prespecific folds and deconfound explaination data and deltas within folds
 
@@ -214,7 +205,6 @@ def deconfound_train_test_data(explanations, deltas, confounds, fold_ids, init_P
     deltas: n_sub x n_fold array, previously calculated age deltas for each fold
     confounds: n_sub x n_var, dataframe of confound variables for each subject
     fold_ids: n_sub array, fold label for each subject
-    init_PCA: number of components for initial dimension reduction
 
     returns
     ------
@@ -224,10 +214,6 @@ def deconfound_train_test_data(explanations, deltas, confounds, fold_ids, init_P
     """
     print('')
     print('deconfounding')
-    # PCA to reduce explanation matrix down a bit for model estimation
-    pca = PCA(n_components=init_PCA)
-    print('inital PCA with: {:} components'.format(init_PCA))
-    print('')
 
     explanations_deconf = np.zeros_like(explanations)
     cv_explanations_deconf = np.zeros_like(explanations[:,:,0])
@@ -248,11 +234,11 @@ def deconfound_train_test_data(explanations, deltas, confounds, fold_ids, init_P
         train_deltas, test_deltas = f_deltas[fold_ids!=fold], f_deltas[fold_ids==fold]
 
         # remove variance due to confounds from explanations (PCA to improve conditioning)
-        train_data_deconf, test_data_deconf = deconfound(pca.fit_transform(train_data), train_confounds, test_data=pca.transform(test_data), test_confounds=test_confounds)
+        train_data_deconf, test_data_deconf = deconfound(train_data, train_confounds, test_data=test_data, test_confounds=test_confounds)
 
         # collate
-        explanations_deconf[fold_ids!=fold,:, f] = pca.inverse_transform(train_data_deconf)
-        explanations_deconf[fold_ids==fold,:, f] = cv_explanations_deconf[fold_ids==fold,:] = pca.inverse_transform(test_data_deconf)
+        explanations_deconf[fold_ids!=fold,:, f] = train_data_deconf
+        explanations_deconf[fold_ids==fold,:, f] = cv_explanations_deconf[fold_ids==fold,:] = test_data_deconf
 
         # remove variance in delta due to confounds
         train_delta_deconf, test_delta_deconf = deconfound(train_deltas, train_confounds, test_data = test_deltas, test_confounds=test_confounds)
@@ -262,7 +248,7 @@ def deconfound_train_test_data(explanations, deltas, confounds, fold_ids, init_P
     return explanations_deconf, cv_explanations_deconf, delta_deconf
 
 
-def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded, fold_ids, component_choice, init_PCA=None):
+def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded, fold_ids, component_choice):
     """
     run PLS training curve within train-test folds
 
@@ -272,7 +258,6 @@ def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded,
     delta_deconf: n_sub x n_fold, deconfounded delta (from model calculated with training data in each fold)
     fold_ids: n_sub array, fold label for each subject
     component_choice: list of PLS component number to run
-    init_PCA: None or int, if not None, then specifiy number of components for initial PCA preprocessing of explanation data
 
     returns
     -------
@@ -280,7 +265,6 @@ def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded,
 
     """
     ss = StandardScaler()
-    pca = PCA(n_components=init_PCA, whiten=True)
 
     fold_train_accuracy = np.zeros((10,5))
     fold_test_accuracy = np.zeros((10,5))
@@ -291,12 +275,8 @@ def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded,
         train_data = explanations_deconfounded[fold_ids!=fold, :, f]
         test_data = explanations_deconfounded[fold_ids==fold, :, f]
 
-        # scale or PCA for preprocessing
-        if init_PCA is not None:
-            print('initialising PLS with {:} component PCA'.format(init_PCA))
-            train_X, test_X = pca.fit_transform(train_data), pca.transform(test_data)
-        else:
-            train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
+        # scale for preprocessing
+        train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
 
         # use deconfounded brain age delta as target
         train_Y, test_Y = delta_deconfounded[fold_ids!=fold, f], delta_deconfounded[fold_ids==fold, f]
@@ -307,7 +287,6 @@ def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded,
         fold_test_accuracy[:,f] = test_acc
 
     return fold_train_accuracy, fold_test_accuracy
-
 
 if __name__ == '__main__':
     main()
