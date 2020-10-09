@@ -59,7 +59,7 @@ def main():
         model_predictions = np.load('{:}{:}-model-all-fold-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
 
         # metadata - get this elsewhere
-        subject_info = subject_data = pd.read_csv(datapath + 'Participant_MetaData.csv')
+        subject_info = pd.read_csv(datapath + 'Participant_MetaData.csv')
 
         # folds
         cv_preds = pd.read_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))
@@ -154,6 +154,11 @@ def main():
         np.save('{:}{:}-model-all-fold-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc), explanations_deconf)
         print('deconfounded model deltas for surrogate analysis: {:}{:}-model-all-fold-deconfounded-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
         np.save('{:}{:}-model-all-fold-deconfounded-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc), delta_deconf)
+        print('deconfounded model explanations - cross-validated: {:}{:}-model-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
+        cv_deconf_out = pd.DataFrame(cv_explanations_deconf)
+        cv_deconf_out = pd.concat((subject_info, cv_deconf_out), axis=1)
+        cv_deconf_out.insert(4, 'fold', cv_folds)
+        cv_deconf_out.to_csv('{:}{:}-model-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model, run_combat, regress, run_pca, parc), index=None)
         print('')
 
         # TRAINING CURVE
@@ -197,7 +202,7 @@ def main():
 
 def deconfound_train_test_data(explanations, deltas, confounds, fold_ids):
     """
-    split data according to prespecific folds and deconfound explaination data and deltas within folds
+    split data according to prespecified folds and deconfound explaination data and deltas within folds
 
     parameters
     ----------

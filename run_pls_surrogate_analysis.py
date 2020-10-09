@@ -7,7 +7,7 @@ import yaml, os
 
 from sklearn.preprocessing import StandardScaler
 
-from functions.pls_models import run_plsr
+from functions.pls_models import run_plsr, plsr_training_curve
 from functions.misc import create_surrogates
 
 from brainsmash.workbench.geo import cortex
@@ -50,7 +50,7 @@ def main():
 	ss = StandardScaler()
 
 	# surrogate analysis
-	n_surrogates = 1000
+	n_surrogates = 500
 
 	# pls
 	plsr_comps = 1
@@ -115,14 +115,19 @@ def main():
 
 	surrogate_target_delta = np.zeros((len(delta_deconf)))
 	surrogate_predicted_delta = np.zeros((len(delta_deconf), n_surrogates))
-	surrogate_explained_delta_var = np.zeros((plsr_comps, 5, n_surrogates))
+	surrogate_explained_delta_var = np.zeros((plsr_comps, n_fold, n_surrogates))
 	surrogate_subject_scores = np.zeros((np.shape(deconfounded_model_explanations)[0], plsr_comps, n_surrogates))
+
+	# train, test curves
+	comp_choice = np.arange(10)+1
+	surrogate_train_accuracy = np.zeros((len(comp_choice), n_fold, n_surrogates))
+	surrogate_test_accuracy = np.zeros((len(comp_choice), n_fold, n_surrogates))
 
 	for f in np.arange(n_fold):
 		print('')
 		print('************* FOLD: {:} **********'.format(f+1))
 
-		if os.path.exists('{:}{:}-model-fold-{:}-surrogates-{:}.npy'.format(surrogates, model, f+1, parc)):
+		if os.path.exists('{:}{:}-model-fold-{:}-{:}surrogates-{:}.npy'.format(surrogates, model, f+1, n_surrogates, parc)):
 			print('surrogate maps already calculated')
 			fold_surrogates = np.load('{:}{:}-model-fold-{:}-{:}surrogates-{:}.npy'.format(surrogates, model, f+1, n_surrogates, parc))
 		else:
@@ -157,13 +162,23 @@ def main():
 			# predicted subject scores
 			surrogate_subject_scores[cv_folds==f+1,:,n] = test_X.dot(weights)
 
+			# training_curve
+			surrogate_fold_train_accuracy, surrogate_fold_test_accuracy = plsr_training_curve(train_X, train_Y, test_X, test_Y, components = comp_choice)
+			surrogate_train_accuracy[:,f,n] = surrogate_fold_train_accuracy
+			surrogate_test_accuracy[:,f,n] = surrogate_fold_test_accuracy
 
 	# save out
 	surrogate_predictions= pd.DataFrame(surrogate_predicted_delta)
 	surrogate_predictions.insert(0,'fold',cv_folds)
 	surrogate_predictions.insert(0,'target',surrogate_target_delta)
 	surrogate_predictions.to_csv('{:}surrogate-{:}-model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=None)
-
+	# training curves
+	train_acc = pd.DataFrame(np.mean(surrogate_train_accuracy, axis=1))
+	train_acc.insert(0, 'components', comp_choice)
+	train_acc.to_csv('{:}surrogate-{:}-model_training_curves-train-accuracy-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=None)
+	test_acc = pd.DataFrame(np.mean(surrogate_test_accuracy, axis=1))
+	test_acc.insert(0, 'components', comp_choice)
+	test_acc.to_csv('{:}surrogate-{:}-model_training_curves-test-accuracy-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=None)
 
 def get_all_surrogates(data, n_surrogates, path_to_surrogates, parc):
 	"""wrapper to create surrogate maps"""

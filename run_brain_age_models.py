@@ -75,7 +75,11 @@ def main():
             image_data = load_surf_data(lh_files, rh_files)
             zero_vector = (np.sum(image_data, axis=0)==0).astype(int)
 
-            parc_data = parcellateSurface(image_data[:,zero_vector==0], zero_vector, parc=parc)
+            if metric=='area':
+                parc_data = parcellateSurface(image_data[:,zero_vector==0], zero_vector, parc=parc, area=True)
+            else:
+                parc_data = parcellateSurface(image_data[:,zero_vector==0], zero_vector, parc=parc, area=False)
+
             # save for later runs
             np.savetxt(chkfile, parc_data, delimiter=',')
 

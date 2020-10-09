@@ -42,15 +42,16 @@ def load_surf_data(left_surface_list, right_surface_list):
     return surf_data
 
 
-def parcellateSurface(data, zero_vector, parc='HCP'):
+def parcellateSurface(data, zero_vector, parc='HCP', area=False):
     """  parcellate data into HCP labels
 
         data: 2D array, subject x vertexwise data (concatenated lh and rh)
         zero_vector: 1D array, vector of length n_vert*2 where 1 indicates a zeroed value
         parc: 'HCP' or 'cust250', parcellate scheme to use
+        area: if area, then use total instead of mean and apply log transform
 
         returns:
-        parcel_data: 1D vector, robust mean of surface values in each parcel"""
+        parcel_data: 1D vector, robust mean/sum of surface values in each parcel"""
 
     parcDir = '/home/gball/PROJECTS/brainAges/parcellations'
 
@@ -94,7 +95,10 @@ def parcellateSurface(data, zero_vector, parc='HCP'):
         for n,k in enumerate(np.unique(labels)[1:]):
             label_data = subject_data[labels==k]
             label_data = label_data[~np.isnan(label_data)]
-            trimmed_mean = trim_mean(label_data, 0.05)
+            if area is True:
+                trimmed_mean = np.log(np.sum(label_data))
+            else:
+                trimmed_mean = trim_mean(label_data, 0.05)
             parcel_data[s,n] = trimmed_mean
 
     return parcel_data

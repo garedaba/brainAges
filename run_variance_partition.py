@@ -39,7 +39,7 @@ def main():
   parc = cfg['data']['parcellation']
 
   # PCA to reduce explanation matrix down a bit for model estimation
-  n_pca_comps = 50
+  n_pca_comps = 100
   pca = PCA(n_components=n_pca_comps)
 
   # linear model
