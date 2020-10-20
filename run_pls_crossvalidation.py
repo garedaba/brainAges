@@ -1,13 +1,16 @@
-## import numpy as np
 import pandas as pd
 import numpy as np
 
+import matplotlib.pyplot as plt
+
+import yaml, os
+
+from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import r2_score
 
-from functions.pls_models import run_plsr, plsr_training_curve
-
-import yaml
+from functions.misc import deconfound
+from functions.pls_models import plsr_training_curve, run_plsr
 
 def main():
     #####################################################################################################
@@ -24,6 +27,7 @@ def main():
     print('')
 
     # set paths
+    datapath = cfg['paths']['datapath']
     outpath = cfg['paths']['results']
     genpath = cfg['paths']['genpath']
 
@@ -36,98 +40,127 @@ def main():
     # cortical parcellation
     parc = cfg['data']['parcellation']
 
-    # set up models
+    # for pls
     ss = StandardScaler()
 
+    # for each model
     for model in ['linear', 'nonlinear', 'ensemble']:
+        print('')
+        print('###### MODEL: {:} ##############'.format(model))
+
         #####################################################################################################
         # LOADING
         # load previously calculated model predictions and explanations
         #####################################################################################################
-
         # load data
-        model_explanations = pd.read_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model, run_combat, regress, run_pca, parc))
-        model_predictions = pd.read_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))
+        # n_sub x n_feature x n_fold array: for each fold, explanations calculated using model trained on training folds
+        model_explanations = np.load('{:}{:}-model-all-fold-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
+        # n_sub x n_folds: for each fold, deltas (uncorrected) predictions using model trained on training folds
+        model_predictions = np.load('{:}{:}-model-all-fold-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
 
-        # metadata
-        subject_info = model_explanations.loc[:, model_explanations.columns.isin(['ID', 'Age', 'Male', 'Site', 'fold'])]
-        # feature importances
-        explanations =  model_explanations.loc[:, ~model_explanations.columns.isin(['ID', 'Age', 'Male', 'Site', 'fold'])]
-        # brain age deltas - corrected or uncorrected
-        #deltas = model_predictions[model+'_uncorr_preds'] - model_predictions.Age
-        deltas = model_predictions[model+'_preds'] - model_predictions.Age
+        # metadata - get this elsewhere
+        subject_info = pd.read_csv(datapath + 'Participant_MetaData.csv')
 
         # folds
-        cv_folds = subject_info.fold.values
+        cv_preds = pd.read_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))
+        cv_folds = cv_preds.fold.values
 
+        # metric data
+        metric_names = ['thickness', 'area']
+        metric_data = []
+        for metric in metric_names:
+            chkfile = genpath + metric + '-parcellated-data-' + parc + '.csv'
+            metric_data.append(np.loadtxt(chkfile, delimiter=','))
+
+        # confounds
+        confounds = pd.DataFrame()
+        confounds['age'] = subject_info.Age
+        confounds['sex'] = subject_info.Male
+        confounds['meanthick'] = np.mean(metric_data[0],1)
+        confounds['meanarea'] = np.mean(metric_data[1],1)
+
+        #########################################################################################################
+        # DECONFOUND
+        # calculate deconfounded explanations and deltas for PLS within CV folds
+        #########################################################################################################
+        # partial out confounds
+        explanations_deconf, cv_explanations_deconf, delta_deconf = deconfound_train_test_data(model_explanations, model_predictions, confounds, cv_folds)
+
+        #########################################################################################################
+        # PLS
+        ##########################################################################################################################
         #####################################################################################################
-        # MODEL TESTING I. - Predicting brain age delta from model explanations...
+        # MODEL TESTING I. - Predicting deconfounded brain age delta from deconfounded model explanations...
         # calculate training curve (within 5-fold CV) for different numbers of PLS components
-        # use same folds as in brain age models
         #####################################################################################################
-        fold_train_accuracy = np.zeros((10,5))
-        fold_test_accuracy = np.zeros((10,5))
         component_choice = np.arange(10)+1
 
         print('')
         print('performing cross-validation for model: {:}'.format(model))
         print('number of PLS components from: {:}'.format(component_choice))
-        for f in np.arange(5):
-            # get model explanations for each fold
-            train_data = explanations[cv_folds!=f+1]
-            test_data = explanations[cv_folds==f+1]
 
-            # scale
-            train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
-
-            # use brain age delta as target
-            train_Y, test_Y = deltas[cv_folds!=f+1].values, deltas[cv_folds==f+1].values
-
-            # fit training curve
-            train_acc, test_acc = plsr_training_curve(train_X, train_Y, test_X, test_Y, components=component_choice)
-            fold_train_accuracy[:,f] = train_acc
-            fold_test_accuracy[:,f] = test_acc
-
-        # choose number of components
-        # plsr_comps = np.where(np.diff(np.insert(np.mean(fold_test_accuracy, axis=1), 0, 0))<.05)[0][0] #adding another component increses R2 by less than 5%
-        plsr_comps = 3
+        fold_train_accuracy, fold_test_accuracy = pls_train_test_training_curve(explanations_deconf, delta_deconf, cv_folds, component_choice)
 
         #####################################################################################################
         # MODEL TESTING II.- Predicting brain age delta from model explanations...
         # within 5-fold CV, calculate spatial maps for each component
         #####################################################################################################
+        plsr_comps = 1
 
         # outputs
-        predicted_delta = np.zeros((len(deltas)))
-        feature_loadings = np.zeros((np.shape(explanations)[1], plsr_comps, 5))  # num_features, num_comps, num_folds
+        target_delta = np.zeros((len(delta_deconf)))
+        predicted_delta = np.zeros((len(delta_deconf)))
+        feature_loadings = np.zeros((np.shape(explanations_deconf)[1], plsr_comps, 5))  # num_features, num_comps, num_folds
         explained_delta_var = np.zeros((plsr_comps, 5))
         explained_image_var = np.zeros((plsr_comps, 5))
-        subject_scores = np.zeros((np.shape(explanations)[0], plsr_comps))
+        subject_scores = np.zeros((np.shape(explanations_deconf)[0], plsr_comps))
 
         print('')
         print('for n components = {:}'.format(plsr_comps))
         print('cross-validating PLS model')
         for f in np.arange(5):
-            train_data = explanations[cv_folds!=f+1]
-            test_data = explanations[cv_folds==f+1]
+            train_data = explanations_deconf[cv_folds!=f+1,:,f]
+            test_data = explanations_deconf[cv_folds==f+1,:,f]
 
+            # preprocess with scaling
             train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
-            train_Y, test_Y = deltas[cv_folds!=f+1].values, deltas[cv_folds==f+1].values
+
+            train_Y, test_Y = delta_deconf[cv_folds!=f+1, f], delta_deconf[cv_folds==f+1, f]
 
             regional_loadings, component_scores, component_loadings, coefs, weights = run_plsr(train_X, train_Y,  n_comps=plsr_comps)
 
             # collect
+            target_delta[cv_folds==f+1] = test_Y
             predicted_delta[cv_folds==f+1] = test_X.dot(coefs.reshape(-1))
-            feature_loadings[:,:,f] = regional_loadings
+
+            # add norm back in
+            rescaled_regional_loadings = np.multiply(regional_loadings, np.linalg.norm(train_X, axis=0).reshape(np.shape(train_X)[1],1))
+            feature_loadings[:,:,f] = rescaled_regional_loadings
+
+            # explained variance
             explained_delta_var[:,f] = component_loadings**2
+            # predicted subject scores
             subject_scores[cv_folds==f+1,:] = test_X.dot(weights)
 
             # add norm back in to calculate correctly
-            regional_loadings = np.multiply(regional_loadings, np.linalg.norm(train_X, axis=0).reshape(np.shape(train_X)[1],1))
             for c in np.arange(plsr_comps):
-                explained_image_var[c,f] = r2_score(train_X, component_scores[:,[c]].dot(regional_loadings[:,[c]].T))
+                explained_image_var[c,f] = r2_score(train_X, component_scores[:,[c]].dot(rescaled_regional_loadings[:,[c]].T))
 
-        ## save out - PLSR results by components
+        #########################################################################################################
+        # save out - PLSR results
+        #########################################################################################################
+        # deconfounded data arrays
+        print('deconfounded model explanations for surrogate analysis: {:}{:}-model-all-fold-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
+        np.save('{:}{:}-model-all-fold-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc), explanations_deconf)
+        print('deconfounded model deltas for surrogate analysis: {:}{:}-model-all-fold-deconfounded-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
+        np.save('{:}{:}-model-all-fold-deconfounded-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc), delta_deconf)
+        print('deconfounded model explanations - cross-validated: {:}{:}-model-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
+        cv_deconf_out = pd.DataFrame(cv_explanations_deconf)
+        cv_deconf_out = pd.concat((subject_info, cv_deconf_out), axis=1)
+        cv_deconf_out.insert(4, 'fold', cv_folds)
+        cv_deconf_out.to_csv('{:}{:}-model-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model, run_combat, regress, run_pca, parc), index=None)
+        print('')
+
         # TRAINING CURVE
         train_results = pd.DataFrame(np.hstack((component_choice[:,np.newaxis],fold_train_accuracy)), columns=['num_comp','1','2','3','4','5'])
         train_results.insert(0, 'group','train')
@@ -145,13 +178,14 @@ def main():
         print('see: {:}{:}-mean-feature-loadings-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
         pd.DataFrame(np.mean(feature_loadings, axis=2)).T.to_csv('{:}{:}-mean-feature-loadings-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
         # delta predictions
-        delta_predictions = pd.DataFrame((cv_folds, deltas, predicted_delta)).T
-        delta_predictions.columns = ['fold','delta','predicted_delta']
+        deltas = cv_preds[model + '_uncorr_preds']-cv_preds.Age
+        delta_predictions = pd.DataFrame((cv_folds, deltas, target_delta, predicted_delta)).T
+        delta_predictions.columns = ['fold','delta', 'deconfounded_delta','predicted_delta']
         print('see: {:}{:}-delta-predictions-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
         delta_predictions.to_csv('{:}{:}-delta-predictions-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
         # subject scores
-        subject_scores = pd.DataFrame(np.hstack((subject_info.ID[:,np.newaxis], cv_folds[:,np.newaxis], deltas[:,np.newaxis], subject_scores)))
-        subject_scores.columns = ['id','fold','delta','PLS1','PLS2','PLS3']
+        subject_scores = pd.DataFrame(np.hstack((subject_info.ID[:,np.newaxis], cv_folds[:,np.newaxis], deltas[:,np.newaxis], target_delta[:,np.newaxis], subject_scores)))
+        subject_scores.columns = ['id','fold','deltas', 'deconfounded_delta'] + ['PLS{:}'.format(i+1) for i in np.arange(plsr_comps)]
         print('see: {:}{:}-subject_scores-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
         subject_scores.to_csv('{:}{:}-subject_scores-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
 
@@ -166,6 +200,98 @@ def main():
         print('see: {:}{:}-explained_variance-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc))
         pd.concat((tmpa, tmpb)).to_csv('{:}{:}-explained_variance-PLS-CV-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=False)
 
+def deconfound_train_test_data(explanations, deltas, confounds, fold_ids):
+    """
+    split data according to prespecified folds and deconfound explaination data and deltas within folds
+
+    parameters
+    ----------
+    explainations: n_sub x n_feature x n_fold array, previously calculated model explaination for each fold
+    deltas: n_sub x n_fold array, previously calculated age deltas for each fold
+    confounds: n_sub x n_var, dataframe of confound variables for each subject
+    fold_ids: n_sub array, fold label for each subject
+
+    returns
+    ------
+    explanations_deconf: n_sub x n_feature x n_fold array, deconfounded explanation data (model calculated within training data and applied to test data in each fold)
+    cv_explanations_deconf: n_sub x n_feature, deconfounded data for each subject in test set of each fold
+    delta_deconf: n_sub x n_fold, deconfounded delta (from model calculated with training data in each fold)
+    """
+    print('')
+    print('deconfounding')
+
+    explanations_deconf = np.zeros_like(explanations)
+    cv_explanations_deconf = np.zeros_like(explanations[:,:,0])
+    delta_deconf = np.zeros_like(deltas)
+
+    for f in np.arange(np.max(fold_ids)):
+        fold = f+1
+
+        # explanations = explained using models fit on train data
+        f_explanations = explanations[:,:,f]
+        train_data, test_data = f_explanations[fold_ids!=fold], f_explanations[fold_ids==fold]
+
+        # split confounds
+        train_confounds, test_confounds = confounds[fold_ids!=fold], confounds[fold_ids==fold]
+
+        # deltas, based on training folds
+        f_deltas = deltas[:,f]
+        train_deltas, test_deltas = f_deltas[fold_ids!=fold], f_deltas[fold_ids==fold]
+
+        # remove variance due to confounds from explanations (PCA to improve conditioning)
+        train_data_deconf, test_data_deconf = deconfound(train_data, train_confounds, test_data=test_data, test_confounds=test_confounds)
+
+        # collate
+        explanations_deconf[fold_ids!=fold,:, f] = train_data_deconf
+        explanations_deconf[fold_ids==fold,:, f] = cv_explanations_deconf[fold_ids==fold,:] = test_data_deconf
+
+        # remove variance in delta due to confounds
+        train_delta_deconf, test_delta_deconf = deconfound(train_deltas, train_confounds, test_data = test_deltas, test_confounds=test_confounds)
+        delta_deconf[fold_ids!=fold, f] = train_delta_deconf
+        delta_deconf[fold_ids==fold, f] = test_delta_deconf
+
+    return explanations_deconf, cv_explanations_deconf, delta_deconf
+
+
+def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded, fold_ids, component_choice):
+    """
+    run PLS training curve within train-test folds
+
+    parameters
+    ---------
+    explanations_deconf: n_sub x n_feature x n_fold array, deconfounded explanation data (model calculated within training data and applied to test data in each fold)
+    delta_deconf: n_sub x n_fold, deconfounded delta (from model calculated with training data in each fold)
+    fold_ids: n_sub array, fold label for each subject
+    component_choice: list of PLS component number to run
+
+    returns
+    -------
+    fold_train_accuracy, fold_test_accuracy: model accuracies for train and test data for each number of components
+
+    """
+    ss = StandardScaler()
+
+    fold_train_accuracy = np.zeros((10,5))
+    fold_test_accuracy = np.zeros((10,5))
+
+    for f in np.arange(np.max(fold_ids)):
+        fold = f+1
+        # get model explanations for each fold (estimated in train/test split)
+        train_data = explanations_deconfounded[fold_ids!=fold, :, f]
+        test_data = explanations_deconfounded[fold_ids==fold, :, f]
+
+        # scale for preprocessing
+        train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
+
+        # use deconfounded brain age delta as target
+        train_Y, test_Y = delta_deconfounded[fold_ids!=fold, f], delta_deconfounded[fold_ids==fold, f]
+
+        # fit training curve
+        train_acc, test_acc = plsr_training_curve(train_X, train_Y, test_X, test_Y, components=component_choice)
+        fold_train_accuracy[:,f] = train_acc
+        fold_test_accuracy[:,f] = test_acc
+
+    return fold_train_accuracy, fold_test_accuracy
 
 if __name__ == '__main__':
     main()

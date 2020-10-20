@@ -75,7 +75,11 @@ def main():
             image_data = load_surf_data(lh_files, rh_files)
             zero_vector = (np.sum(image_data, axis=0)==0).astype(int)
 
-            parc_data = parcellateSurface(image_data[:,zero_vector==0], zero_vector, parc=parc)
+            if metric=='area':
+                parc_data = parcellateSurface(image_data[:,zero_vector==0], zero_vector, parc=parc, area=True)
+            else:
+                parc_data = parcellateSurface(image_data[:,zero_vector==0], zero_vector, parc=parc, area=False)
+
             # save for later runs
             np.savetxt(chkfile, parc_data, delimiter=',')
 
@@ -94,6 +98,9 @@ def main():
     fold = np.zeros((n_subs, 1))
     feature_explanations = np.zeros((3, n_subs, n_features*2))
     sample_mean_feature_explanations = np.zeros((3, n_subs, n_features*2))
+
+    fold_predictions = np.zeros((3, n_subs, 5)) #num models x num subs x num folds
+    fold_feature_explanations = np.zeros((3, n_subs, n_features*2, 5)) # num models x num subs x num features x num folds
 
     linear_model_coefficients = np.zeros((5, n_features*2)) # num_folds x features
 
@@ -131,6 +138,10 @@ def main():
             uncorr_preds[test_idx, m] = test_predictions
             preds[test_idx, m] = correct_age_predictions(train_predictions, train_y, test_predictions, test_y)
 
+            # collate brain age delta for later models
+            fold_predictions[m, train_idx, n] =  train_predictions - train_y
+            fold_predictions[m, test_idx, n] =  test_predictions - test_y
+
             print('{:} model: r2 score = {:.2f}'.format(model_name, r2_score(test_y, uncorr_preds[test_idx, m])))
             print('{:} correlation between age and delta = {:.2f}'.format(model_name, np.corrcoef(test_y, uncorr_preds[test_idx, m]-test_y)[0,1]))
             print('{:} correlation between age and corrected delta = {:.2f}'.format(model_name, np.corrcoef(test_y, preds[test_idx, m]-test_y)[0,1]))
@@ -139,17 +150,28 @@ def main():
             # EXPLAIN
             print('calculating {:} model explanations for test data'.format(model_name))
             exp_features = round(np.shape(train_x)[1]/2) # at most 50% of regions used in explanation
-            model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
+            test_model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
+            train_model_explanations = np.zeros((np.shape(train_x)[0], np.shape(train_x)[1]))
             sample_mean_model_explanations = np.zeros((np.shape(test_x)[0], np.shape(test_x)[1]))
 
+            # test explanations
             for s in tqdm(np.arange(len(test_x))):
-                model_explanations[s,:] = get_age_corrected_model_explanations(model, train_x, train_y, test_x[s,:].reshape(1,-1),
+                test_model_explanations[s,:] = get_age_corrected_model_explanations(model, train_x, train_y, test_x[s,:].reshape(1,-1),
                                                                                     age=test_y.iloc[s], num_features=exp_features)
             sample_mean_model_explanations = get_model_explanations(model, train_x, test_x, num_features=exp_features)
 
+            # train explanations - for training set examples (exclude self)
+            print('calculating {:} model explanations for train data'.format(model_name))
+            num_train = len(train_x)
+            for s in tqdm(np.arange(num_train)):
+                train_model_explanations[s,:] = get_age_corrected_model_explanations(model, train_x[np.arange(num_train)!=s,:], train_y[np.arange(num_train)!=s], train_x[s,:].reshape(1,-1),
+                                                                                    age=train_y.iloc[s], num_features=exp_features)
+
             # collate
-            feature_explanations[m, test_idx, :] = model_explanations
+            feature_explanations[m, test_idx, :] = test_model_explanations
             sample_mean_feature_explanations[m, test_idx, :] = sample_mean_model_explanations
+            fold_feature_explanations[m, test_idx, :, n] = test_model_explanations
+            fold_feature_explanations[m, train_idx, :, n] = train_model_explanations
 
             # also keep model coefficients for linear models
             if model_name == 'linear':
@@ -217,6 +239,12 @@ def main():
         feat_exp.to_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
         mean_feat_exp.to_csv('{:}{:}-model-group-mean-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
 
+        # save for later CV models
+        print('model explanations for cross-validation: {:}{:}-model-all-fold-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model_name, run_combat, regress, run_pca, parc))
+        np.save('{:}{:}-model-all-fold-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model_name, run_combat, regress, run_pca, parc), fold_feature_explanations[m,:,:,:])
+        print('model predictions for cross-validation: {:}{:}-model-all-fold-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model_name, run_combat, regress, run_pca, parc))
+        np.save('{:}{:}-model-all-fold-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model_name, run_combat, regress, run_pca, parc), fold_predictions[m,:,:])
+
         if model_name == 'linear':
             fold_col = pd.DataFrame(np.arange(5).reshape(-1,1), columns=['fold'])
             coef = pd.DataFrame(linear_model_coefficients)
@@ -224,6 +252,7 @@ def main():
             print('model coefficients: {:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc))
             print('')
             feat_coef.to_csv('{:}{:}-model-feature-coefficients-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
+
 
 if __name__ == '__main__':
     main()

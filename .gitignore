@@ -12,3 +12,5 @@ figures
 functions/__pycache__
 plots
 surrogates
+old
+__pycache__

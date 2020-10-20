@@ -108,6 +108,7 @@ def get_model_explanations(model, train_data, test_data, background_samples=10, 
     explanations = explainer.shap_values(test_data, nsamples=nsamples, l1_reg='num_features({:})'.format(num_features))
 
     return explanations
+    
 
 def get_age_corrected_model_explanations(model, train_data, train_age, test_data, age=12, background_samples=10, nsamples='auto', num_features=50):
     """runs KernelSHAP on model and returns subjectwise model explanations. In contrast to get_model_explanations()
