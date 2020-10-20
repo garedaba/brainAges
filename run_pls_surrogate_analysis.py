@@ -83,7 +83,7 @@ def main():
 		if parc=='HCP':
 			parcfile = '{:}{:}.HCP-MMP1-fsaverage5.annot'.format(parcdir, hemi)
 		else:
-			parcfile = '{:}{:}.custom500.annot'.format(parcdir, hemi)
+			parcfile = '{:}{:}.custom500-fsaverage5.annot'.format(parcdir, hemi)
 
 		if os.path.exists('{:}{:}.{:}.annot.gii'.format(surrogates, hemi, parc)):
 			print('annotation file already exists')
@@ -127,13 +127,13 @@ def main():
 		print('')
 		print('************* FOLD: {:} **********'.format(f+1))
 
-		if os.path.exists('{:}{:}-model-fold-{:}-{:}surrogates-{:}.npy'.format(surrogates, model, f+1, n_surrogates, parc)):
+		if os.path.exists('{:}{:}-model-fold-{:}-{:}surrogates-{:}-{:}-{:}-{:}.npy'.format(surrogates, model, f+1, n_surrogates, run_combat, regress, run_pca, parc )):
 			print('surrogate maps already calculated')
-			fold_surrogates = np.load('{:}{:}-model-fold-{:}-{:}surrogates-{:}.npy'.format(surrogates, model, f+1, n_surrogates, parc))
+			fold_surrogates = np.load('{:}{:}-model-fold-{:}-{:}surrogates-{:}-{:}-{:}-{:}.npy'.format(surrogates, model, f+1, n_surrogates, run_combat, regress, run_pca, parc))
 		else:
 			# create surrogate maps
 			fold_surrogates = get_all_surrogates(deconfounded_model_explanations[:,:,f], n_surrogates, surrogates, parc)
-			np.save('{:}{:}-model-fold-{:}-{:}surrogates-{:}.npy'.format(surrogates, model, f+1, n_surrogates, parc), fold_surrogates)
+			np.save('{:}{:}-model-fold-{:}-{:}surrogates-{:}-{:}-{:}-{:}.npy'.format(surrogates, model, f+1, n_surrogates, run_combat, regress, run_pca, parc), fold_surrogates)
 
 		# perform PLS for 1 comp
 		print('')
@@ -206,7 +206,7 @@ def get_all_surrogates(data, n_surrogates, path_to_surrogates, parc):
 			# get surrogates with matched SA
 			surrogate_exp_maps = create_surrogates(exp_map,
 										 '{:}{:}_{:}_parcelGeodesicDistMat.txt'.format(path_to_surrogates, hemi, parc),
-										 n_repeats=n_surrogates)
+										 n_repeats=n_surrogates, n_jobs=10)
 
 			for n,i in enumerate(surrogate_exp_maps):
 				fold_surrogates[:,start:end,n] = i
