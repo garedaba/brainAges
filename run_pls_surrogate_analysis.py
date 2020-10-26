@@ -47,13 +47,13 @@ def main():
 
 	# nonlinear only
 	model = 'nonlinear'
-	ss = StandardScaler()
+	ss = StandardScaler(with_std=True)
 
 	# surrogate analysis
-	n_surrogates = 500
+	n_surrogates = 100
 
 	# pls
-	plsr_comps = 1
+	plsr_comps = 3
 
 	#####################################################################################################
 	# SURROGATE ANALYSIS
@@ -81,7 +81,7 @@ def main():
 
 		# convert parcelation into gifti
 		if parc=='HCP':
-			parcfile = '{:}{:}.HCP-MMP1-fsaverage5.annot'.format(parcdir, hemi)
+			parcfile = '{:}{:}.HCP-MMP1-fsaverage5-noHipp.annot'.format(parcdir, hemi)
 		else:
 			parcfile = '{:}{:}.custom500-fsaverage5.annot'.format(parcdir, hemi)
 
@@ -104,7 +104,6 @@ def main():
 	# Load deconfounded data, create surrogates and perform PLS
 	##############################################################################################################
 	# load (deconfounded) brainage explanations
-
 	deconfounded_model_explanations = np.load('{:}{:}-model-all-fold-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
 	delta_deconf = np.load('{:}{:}-model-all-fold-deconfounded-delta-{:}-{:}-{:}-{:}.npy'.format(genpath, model, run_combat, regress, run_pca, parc))
 	n_sub, n_feat, n_fold = np.shape(deconfounded_model_explanations)
@@ -147,6 +146,10 @@ def main():
 		for n in tqdm(np.arange(n_surrogates)):
 			train_data = fold_surrogates[cv_folds!=f+1,:,n]
 			test_data = fold_surrogates[cv_folds==f+1,:,n]
+
+			# remove mean from each subjects map - relative increase/decrease is of interest
+			train_data = train_data - np.mean(train_data, axis=1)[:,np.newaxis]
+			test_data = test_data - np.mean(test_data, axis=1)[:,np.newaxis]
 
 			# preprocess with scaling
 			train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)

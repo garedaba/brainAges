@@ -37,11 +37,11 @@ def main():
     parc = cfg['data']['parcellation']
 
     # nonlinear only
-    model = 'nonlinear'
+    model = 'linear'
 
     # PCA
     n_comps = 10
-    ss = StandardScaler()
+    ss = StandardScaler(with_std=False)
     pca = PCA(n_components = n_comps)
 
     # surrogates
@@ -56,6 +56,9 @@ def main():
     cv_deconfounded_data  = pd.read_csv('{:}{:}-model-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model, run_combat, regress, run_pca, parc))
     cv_folds = cv_deconfounded_data.fold.values
     cv_deconfounded_data = cv_deconfounded_data.drop(['ID', 'Age', 'Male', 'Site', 'fold'], axis='columns')
+
+    # remove dubjectwise mean
+    cv_deconfounded_data = cv_deconfounded_data - np.mean(cv_deconfounded_data, axis=1)[:,np.newaxis]
 
     ##############################################################################################################
     # load surrogates and run PCA
@@ -108,12 +111,15 @@ def main():
 
 
 def run_pcas(maps, n_comps=10):
-    ss = StandardScaler()
+    ss = StandardScaler(with_std=False)
     pca = PCA(n_components = n_comps)
 
     variance_explained = []
     for k in np.arange(np.shape(maps)[2]):
-        pca.fit(ss.fit_transform(maps[:,:,k]))
+        # remove dubjectwise mean
+        dm_map = maps[:,:,k] - np.mean(maps[:,:,k], axis=1)[:,np.newaxis]
+        #pca.fit(ss.fit_transform(maps[:,:,k]))
+        pca.fit(ss.fit_transform(dm_map))
         variance_explained.append(pca.explained_variance_ratio_)
 
     variance_explained = np.stack(variance_explained)

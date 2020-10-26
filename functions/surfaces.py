@@ -1,6 +1,7 @@
 import numpy as np
 import os, sys
 
+import nibabel as nib
 from nibabel.freesurfer import mghformat, MGHImage
 
 from scipy.stats import trim_mean
@@ -57,18 +58,12 @@ def parcellateSurface(data, zero_vector, parc='HCP', area=False):
 
     # load up maps
     if parc=='HCP':
-        rh_labels = mghformat.load(parcDir + '/rh.HCP-MMP1.mgh')
-        rh_labels = np.array(rh_labels.get_fdata()).squeeze()
-
-        lh_labels  = mghformat.load(parcDir + '/lh.HCP-MMP1.mgh')
-        lh_labels = np.array(lh_labels.get_fdata()).squeeze()
+        rh_labels, _, _  = nib.freesurfer.io.read_annot(parcDir + '/rh.HCP-MMP1-fsaverage5-noHipp.annot', orig_ids=False)
+        lh_labels, _, _  = nib.freesurfer.io.read_annot(parcDir + '/lh.HCP-MMP1-fsaverage5-noHipp.annot', orig_ids=False)
 
     elif parc=='cust250':
-        rh_labels = mghformat.load(parcDir + '/rh.custom500.mgh')
-        rh_labels = np.array(rh_labels.get_fdata()).squeeze()
-
-        lh_labels  = mghformat.load(parcDir + '/lh.custom500.mgh')
-        lh_labels = np.array(lh_labels.get_fdata()).squeeze()
+        rh_labels, _, _  = nib.freesurfer.io.read_annot(parcDir + '/rh.custom500-fsaverage5.annot', orig_ids=False)
+        lh_labels, _, _  = nib.freesurfer.io.read_annot(parcDir + '/rh.custom500-fsaverage5.annot', orig_ids=False)
 
     else:
         print('ERROR: unknown parcellation scheme')
@@ -102,51 +97,3 @@ def parcellateSurface(data, zero_vector, parc='HCP', area=False):
             parcel_data[s,n] = trimmed_mean
 
     return parcel_data
-
-
-def save_surface_out(data, plot_path, hemi='lh', parc='HCP', template='fsaverage5'):
-        """save data to a freesurfer surface file.
-        can be parcellated ('HCP', 'cust250') or vertexwise ('vertex')
-
-        data, 1D array, data to be saved
-        plot_path, path to output directory
-        hemi: 'lh' or 'rh'
-        parc: 'HCP', 'cust250', 'vertex'
-        template: 'fsaverage' or 'fsaverage5'
-
-        """
-        parc_dir = '/home/gball/PROJECTS/brainAges/parcellations'
-
-        if parc=='HCP':
-                labels  = mghformat.load(parc_dir + '/' + hemi + '.HCP-MMP1.mgh')
-                labels = np.array(labels.get_fdata()).squeeze()
-
-                out_data = np.zeros(np.shape(labels))
-                for n,i in enumerate(np.arange(max(labels))):
-                        out_data[labels==n+1] = data[n]
-
-        elif parc=='cust250':
-                labels  = mghformat.load(parc_dir + '/' + hemi + '.custom500.mgh')
-                labels = np.array(labels.get_fdata()).squeeze()
-
-                out_data = np.zeros(np.shape(labels))
-                for n,i in enumerate(np.arange(max(labels))):
-                        out_data[labels==n+1] = data[n]
-
-        elif parc=='vertex':
-                out_data = data
-
-        else:
-            print('ERROR: unknown parcellation scheme')
-            sys.exit(1)
-
-        surfname =os.environ['FREESURFER_HOME'] + '/subjects/' + template + '/surf/' + hemi + '.white.avg.area.mgh'
-        surf_data = mghformat.load(surfname)
-        surf_data.get_fdata()[:] = out_data.reshape(-1,1,1)
-
-        comp=MGHImage((np.asarray(surf_data.get_fdata())),
-                                        surf_data.affine ,
-                                        extra=surf_data.extra,
-                                        header=surf_data.header,
-                                        file_map=surf_data.file_map)
-        mghformat.save(comp, plot_path + '/' + hemi + '.out_data.mgh')

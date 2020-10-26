@@ -41,7 +41,7 @@ def main():
     parc = cfg['data']['parcellation']
 
     # for pls
-    ss = StandardScaler()
+    ss = StandardScaler(with_std=True)
 
     # for each model
     for model in ['linear', 'nonlinear', 'ensemble']:
@@ -105,7 +105,7 @@ def main():
         # MODEL TESTING II.- Predicting brain age delta from model explanations...
         # within 5-fold CV, calculate spatial maps for each component
         #####################################################################################################
-        plsr_comps = 1
+        plsr_comps = 3
 
         # outputs
         target_delta = np.zeros((len(delta_deconf)))
@@ -122,7 +122,11 @@ def main():
             train_data = explanations_deconf[cv_folds!=f+1,:,f]
             test_data = explanations_deconf[cv_folds==f+1,:,f]
 
-            # preprocess with scaling
+            # remove mean from each subjects map - relative increase/decrease is of interest
+            #train_data = train_data - np.mean(train_data, axis=1)[:,np.newaxis]
+            #test_data = test_data - np.mean(test_data, axis=1)[:,np.newaxis]
+
+            # preprocess with mean centering
             train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
 
             train_Y, test_Y = delta_deconf[cv_folds!=f+1, f], delta_deconf[cv_folds==f+1, f]
@@ -269,7 +273,7 @@ def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded,
     fold_train_accuracy, fold_test_accuracy: model accuracies for train and test data for each number of components
 
     """
-    ss = StandardScaler()
+    ss = StandardScaler(with_std=True)
 
     fold_train_accuracy = np.zeros((10,5))
     fold_test_accuracy = np.zeros((10,5))
@@ -279,6 +283,10 @@ def pls_train_test_training_curve(explanations_deconfounded, delta_deconfounded,
         # get model explanations for each fold (estimated in train/test split)
         train_data = explanations_deconfounded[fold_ids!=fold, :, f]
         test_data = explanations_deconfounded[fold_ids==fold, :, f]
+
+        # remove mean from each subjects map - relative increase/decrease is of interest
+        #train_data = train_data - np.mean(train_data, axis=1)[:,np.newaxis]
+        #test_data = test_data - np.mean(test_data, axis=1)[:,np.newaxis]
 
         # scale for preprocessing
         train_X, test_X = ss.fit_transform(train_data), ss.transform(test_data)
