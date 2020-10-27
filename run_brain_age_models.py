@@ -97,7 +97,6 @@ def main():
     uncorr_preds = np.zeros((n_subs, 3))
     fold = np.zeros((n_subs, 1))
     feature_explanations = np.zeros((3, n_subs, n_features*2))
-    sample_mean_feature_explanations = np.zeros((3, n_subs, n_features*2))
 
     fold_predictions = np.zeros((3, n_subs, 5)) #num models x num subs x num folds
     fold_feature_explanations = np.zeros((3, n_subs, n_features*2, 5)) # num models x num subs x num features x num folds
@@ -158,7 +157,6 @@ def main():
             for s in tqdm(np.arange(len(test_x))):
                 test_model_explanations[s,:] = get_age_corrected_model_explanations(model, train_x, train_y, test_x[s,:].reshape(1,-1),
                                                                                     age=test_y.iloc[s], num_features=exp_features)
-            #sample_mean_model_explanations = get_model_explanations(model, train_x, test_x, num_features=exp_features)
 
             # train explanations - for training set examples (exclude self)
             print('calculating {:} model explanations for train data'.format(model_name))
@@ -169,7 +167,6 @@ def main():
 
             # collate
             feature_explanations[m, test_idx, :] = test_model_explanations
-            #sample_mean_feature_explanations[m, test_idx, :] = sample_mean_model_explanations
             fold_feature_explanations[m, test_idx, :, n] = test_model_explanations
             fold_feature_explanations[m, train_idx, :, n] = train_model_explanations
 
@@ -230,14 +227,11 @@ def main():
     # explanations
     for m, model_name in enumerate(['linear', 'nonlinear', 'ensemble']):
         exp = pd.DataFrame(feature_explanations[m])
-        #mean_exp = pd.DataFrame(sample_mean_feature_explanations[m])
         fold = pd.DataFrame(fold.astype(int), columns=['fold'])
         feat_exp = pd.concat((subject_data, fold, exp), axis=1)
-        #mean_feat_exp = pd.concat((subject_data, fold, mean_exp), axis=1)
         print('model explanations: {:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc))
         print('')
         feat_exp.to_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
-        #mean_feat_exp.to_csv('{:}{:}-model-group-mean-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model_name, run_combat, regress, run_pca, parc), index=False)
 
         # save for later CV models
         print('model explanations for cross-validation: {:}{:}-model-all-fold-feature-explanations-{:}-{:}-{:}-{:}.npy'.format(genpath, model_name, run_combat, regress, run_pca, parc))

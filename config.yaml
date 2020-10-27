@@ -4,7 +4,7 @@ paths:
   genpath : /home/gball/PROJECTS/brainAges/generated_data/
 
 data:
-  parcellation : cust250
+  parcellation : HCP
 
 preproc:
   combat : yes

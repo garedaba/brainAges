@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
 
-import matplotlib.pyplot as plt
-
 import yaml, os
 
 from sklearn.decomposition import PCA
@@ -53,7 +51,7 @@ def main():
       # load previously calculated model predictions and explanations
       #####################################################################################################
 
-      # load data
+      # load data - cross-validated model explanations and predictions
       model_explanations = pd.read_csv('{:}{:}-model-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model, run_combat, regress, run_pca, parc))
       model_predictions = pd.read_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))
 
@@ -122,7 +120,6 @@ def main():
       # save out
       delta_given_confounds.to_csv('{:}partial-correlations-explanations-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=None)
       delta_given_explanations.to_csv('{:}partial-correlations-confounds-{:}-{:}-{:}-{:}-{:}.csv'.format(outpath, model, run_combat, regress, run_pca, parc), index=None)
-
 
 if __name__ == '__main__':
     main()
