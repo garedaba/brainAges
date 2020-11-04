@@ -63,7 +63,7 @@ def parcellateSurface(data, zero_vector, parc='HCP', area=False):
 
     elif parc=='cust250':
         rh_labels, _, _  = nib.freesurfer.io.read_annot(parcDir + '/rh.custom500-fsaverage5.annot', orig_ids=False)
-        lh_labels, _, _  = nib.freesurfer.io.read_annot(parcDir + '/rh.custom500-fsaverage5.annot', orig_ids=False)
+        lh_labels, _, _  = nib.freesurfer.io.read_annot(parcDir + '/lh.custom500-fsaverage5.annot', orig_ids=False)
 
     else:
         print('ERROR: unknown parcellation scheme')

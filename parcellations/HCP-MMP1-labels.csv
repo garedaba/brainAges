@@ -1,0 +1,180 @@
+ID,Area,Description,Region
+1,V1,primary visual cortex  ,occipital
+2,MST,medial superior temporal area ,temporal
+3,V6,sixth visual area  ,occipital
+4,V2,second visual area  ,occipital
+5,V3,third visual area  ,occipital
+6,V4,fourth visual area  ,occipital
+7,V8,eighth visual area  ,occipital
+8,4,primary motor cortex  ,frontal
+9,3b,primary sensory cortex  ,parietal
+10,FEF,frontal eye fields  ,frontal
+11,PEF,premotor eye field  ,frontal
+12,55b,area 55b   ,frontal
+13,V3A,area V3A   ,occipital
+14,RSC,retrosplenial complex   ,retrosplenial
+15,POS2,parieto-occipital sulcus area 2 ,parietal
+16,V7,seventh visual area  ,occipital
+17,IPS1,intraparietal sulcus area 1 ,parietal
+18,FFC,fusiform face complex  ,temporal
+19,V3B,area V3B   ,occipital
+20,LO1,area lateral occipital 1 ,occipital
+21,LO2,area lateral occipital 2 ,occipital
+22,PIT,posterior inferotemporal complex  ,temporal
+23,MT,middle temporal area  ,temporal
+24,A1,primary auditory cortex  ,temporal
+25,PSL,perisylvian language area  ,temporal
+26,SFL,superior frontal language area ,frontal
+27,PCV,precuneus visual area  ,parietal
+28,STV,superior temporal visual  ,temporal
+29,7Pm,medial area 7P  ,parietal
+30,7m,area 7m   ,parietal
+31,POS1,parieto-occipital sulcus area 1 ,parietal
+32,23d,area 23d   ,cingulate
+33,v23ab,area ventral 23 a+b ,cingulate
+34,d23ab,area dorsal 23 a+b ,cingulate
+35,31pv,area 31p ventral  ,cingulate
+36,5m,area 5m   ,parietal
+37,5mv,area 5m ventral  ,parietal
+38,23c,area 23c   ,cingulate
+39,5L,area 5L   ,parietal
+40,24dd,dorsal area 24d  ,cingulate
+41,24dv,ventral area 24d  ,cingulate
+42,7AL,lateral area 7A  ,parietal
+43,SCEF,supplementary and cingulate eye field,cingulate
+44,6ma,area 6m anterior  ,frontal
+45,7Am,medial area 7A  ,parietal
+46,7PL,lateral area 7P  ,parietal
+47,7PC,area 7PC   ,parietal
+48,LIPv,area lateral intraparietal ventral ,parietal
+49,VIP,ventral intraparietal complex  ,parietal
+50,MIP,medial intraparietal area  ,parietal
+51,1,area 1   ,parietal
+52,2,area 2   ,parietal
+53,3a,area 3a   ,parietal
+54,6d,dorsal area 6  ,frontal
+55,6mp,area 6mp   ,frontal
+56,6v,ventral area 6  ,frontal
+57,p24pr,area posterior 24 prime ,cingulate
+58,33pr,area 33 prime  ,cingulate
+59,a24pr,anterior 24 prime  ,cingulate
+60,p32pr,area p32 prime  ,cingulate
+61,a24,area a24   ,cingulate
+62,d32,area dorsal 32  ,cingulate
+63,8BM,area 8BM   ,frontal
+64,p32,area p32   ,cingulate
+65,10r,area 10r   ,frontal
+66,47m,area 47m   ,frontal
+67,8Av,area 8Av   ,frontal
+68,8Ad,area 8Ad   ,frontal
+69,9m,area 9   ,frontal
+70,8BL,area 8B   ,frontal
+71,9p,area 9 posterior  ,frontal
+72,10d,area 10d   ,frontal
+73,8C,area 8C   ,frontal
+74,44,area 44   ,frontal
+75,45,area 45   ,frontal
+76,47l,area 47 lateral  ,frontal
+77,a47r,area anterior 47r  ,frontal
+78,6r,rostral area 6  ,frontal
+79,IFJa,area inferior frontal junction (a)   ,frontal
+80,IFJp,area inferior frontal junction (p)   ,frontal
+81,IFSp,area inferior frontal sulcus (p)   ,frontal
+82,IFSa,area inferior frontal sulcus (a)   ,frontal
+83,p9-46v,area posterior 9-46v  ,frontal
+84,46,area 46   ,frontal
+85,a9-46v,area anterior 9-46v  ,frontal
+86,9-46d,area 9-46d   ,frontal
+87,9a,area 9 anterior  ,frontal
+88,10v,area 10v   ,frontal
+89,a10p,area anterior 10p  ,frontal
+90,10pp,polar 10p   ,frontal
+91,11l,area 11l   ,frontal
+92,13l,area 13l   ,frontal
+93,OFC,orbital frontal complex  ,frontal
+94,47s,area 47s   ,frontal
+95,LIPd,area lateral intraparietal dorsal ,parietal
+96,6a,area 6 anterior  ,frontal
+97,i6-8,inferior 6-8 transitional area ,frontal
+98,s6-8,superior 6-8 transitional area ,frontal
+99,43,area 43   ,parietal
+100,OP4,area operculum 4/PV   ,parietal
+101,OP1,area operculum 1/SII   ,parietal
+102,OP2-3,area operculum 2-3/VS   ,parietal
+103,52,area 52   ,insular
+104,RI,retroinsular cortex   ,insular
+105,PFcm,area PFcm   ,parietal
+106,PoI2,posterior insular area 2 ,insular
+107,TA2,area TA2   ,temporal
+108,FOP4,frontal opercular area 4 ,frontal
+109,MI,middle insular area  ,insular
+110,Pir,piriform cortex   ,insular
+111,AVI,anterior ventral insular area ,insular
+112,AAIC,anterior agranular insula complex ,insular
+113,FOP1,frontal opercular area 1 ,frontal
+114,FOP3,frontal opercular area 3 ,frontal
+115,FOP2,frontal opercular area 2 ,frontal
+116,PFt,area PFt   ,parietal
+117,AIP,anterior intraparietal area  ,parietal
+118,EC,entorhinal cortex   ,temporal
+119,PreS,presubiculum    ,temporal
+121,ProS,prostriate    ,occipital
+122,PeEc,perirhinal ectorhinal cortex  ,temporal
+123,STGa,area STGa   ,temporal
+124,PBelt,parabelt complex   ,temporal
+125,A5,auditory 5   ,temporal
+126,PHA1,parahippocampal area 1  ,temporal
+127,PHA3,parahippocampal area 3  ,temporal
+128,STSda,area superior temporal sulcus (d) anterior  ,temporal
+129,STSdp,area superior temporal sulcus (d) posterior  ,temporal
+130,STSvp,area superior temporal sulcus (v) posterior  ,temporal
+131,TGd,area TG dorsal  ,temporal
+132,TE1a,area TE1 anterior  ,temporal
+133,TE1p,area TE1 posterior  ,temporal
+134,TE2a,area TE2 anterior  ,temporal
+135,TF,area TF   ,temporal
+136,TE2p,area TE2 posterior  ,temporal
+137,PHT,area PHT   ,temporal
+138,PH,area PH   ,temporal
+139,TPOJ1,area temporoparietooccipital junction 1 ,temporal
+140,TPOJ2,area temporoparietooccipital junction 2 ,temporal
+141,TPOJ3,area temporoparietooccipital junction 3 ,temporal
+142,DVT,dorsal transitional visual area ,occipital
+143,PGp,area PGp   ,parietal
+144,IP2,area intraparietal 2  ,parietal
+145,IP1,area intraparietal 1  ,parietal
+146,IP0,area intraparietal 0  ,parietal
+147,PFop,area PF opercular  ,parietal
+148,PF,area PF complex  ,parietal
+149,PFm,area PFm complex  ,parietal
+150,PGi,area PGi   ,parietal
+151,PGs,area PGs   ,parietal
+152,V6A,area V6A   ,occipital
+153,VMV1,ventromedial visual area 1 ,occipital
+154,VMV3,ventromedial visual area 3 ,occipital
+155,PHA2,parahippocampal area 2  ,temporal
+156,V4t,area V4t   ,temporal
+157,FST,area FST   ,temporal
+158,V3CD,area V3CD   ,occipital
+159,LO3,area lateral occipital 3 ,occipital
+160,VMV2,ventromedial visual area 2 ,occipital
+161,31pd,area 31pd   ,cingulate
+162,31a,area 31a   ,cingulate
+163,VVC,ventral visual complex  ,temporal
+164,25,area 25   ,cingulate
+165,s32,area s32   ,cingulate
+166,pOFC,posterior OFC complex  ,frontal
+167,PoI1,area posterior insular 1 ,insular
+168,Ig,insular granular complex  ,insular
+169,FOP5,area frontal opercular 5 ,frontal
+170,p10p,area posterior 10p  ,frontal
+171,p47r,area posterior 47r  ,frontal
+172,TGv,area TG ventral  ,temporal
+173,MBelt,medial belt complex  ,temporal
+174,LBelt,lateral belt complex  ,temporal
+175,A4,auditory 4 complex  ,temporal
+176,STSva,area superior temporal sulcus (v) anterior  ,temporal
+177,TE1m,area TE1 middle  ,temporal
+178,PI,para-insular area   ,insular
+179,a32pr,area anterior 32 prime ,cingulate
+180,p24,area posterior 24  ,cingulate
