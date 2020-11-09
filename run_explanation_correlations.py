@@ -35,7 +35,7 @@ def main():
     # load data #################################################################################3#############
     for model in ['linear', 'nonlinear', 'ensemble']:
         print('*********** {:} model *******************'.format(model))
-        # load deconfounded eplanations and predicitons etc
+        # load deconfounded explanations and predictions etc
         model_explanations = pd.read_csv('{:}{:}-model-deconfounded-feature-explanations-{:}-{:}-{:}-{:}.csv'.format(genpath, model, run_combat, regress, run_pca, parc))
         explanations = model_explanations.loc[:,~model_explanations.columns.isin(['ID', 'Age', 'Male', 'Site', 'fold'])]
         model_predictions = pd.read_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc))

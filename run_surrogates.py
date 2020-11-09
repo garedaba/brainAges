@@ -98,7 +98,6 @@ def main(model='nonlinear', n_surrogates = 500):
 
     if os.path.exists('{:}{:}-model-{:}surrogates-{:}-{:}-{:}-{:}.npy'.format(surrogates, model, n_surrogates, run_combat, regress, run_pca, parc )):
         print('surrogate maps already calculated')
-        fold_surrogates = np.load('{:}{:}-model-{:}surrogates-{:}-{:}-{:}-{:}.npy'.format(surrogates, model, n_surrogates, run_combat, regress, run_pca, parc))
     else:
         # create surrogate maps
         fold_surrogates = get_all_surrogates(deconfounded_model_explanations, n_surrogates, surrogates, parc)

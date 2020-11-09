@@ -68,7 +68,7 @@ def main():
 
         #########################################################################################################
         # DECONFOUND
-        # calculate deconfounded explanations and deltas for PLS within CV folds
+        # calculate deconfounded explanations and deltas within CV folds
         #########################################################################################################
         # partial out confounds
         explanations_deconf, cv_explanations_deconf, delta_deconf, cv_delta_deconf = deconfound_train_test_data(model_explanations, model_predictions, confounds, cv_folds)
@@ -136,7 +136,7 @@ def deconfound_train_test_data(explanations, deltas, confounds, fold_ids):
         f_deltas = deltas[:,f]
         train_deltas, test_deltas = f_deltas[fold_ids!=fold], f_deltas[fold_ids==fold]
 
-        # remove variance due to confounds from explanations (PCA to improve conditioning)
+        # remove variance due to confounds from explanations
         train_data_deconf, test_data_deconf = deconfound(train_data, train_confounds, test_data=test_data, test_confounds=test_confounds)
 
         # collate

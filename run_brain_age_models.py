@@ -196,7 +196,7 @@ def main():
     print('')
     predictions.to_csv('{:}model_predictions-{:}-{:}-{:}-{:}.csv'.format(outpath, run_combat, regress, run_pca, parc), index=False)
 
-    # accuracies and AUC
+    # accuracies 
     n_fold = len(np.unique(predictions.fold))
     models = ['linear', 'nonlinear', 'ensemble']
 
